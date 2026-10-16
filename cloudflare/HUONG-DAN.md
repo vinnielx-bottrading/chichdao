@@ -21,8 +21,17 @@ Trình duyệt ──► Supabase Auth (chỉ để đăng nhập Google/email)
 chich-dao-media/                      (bucket private)
 ├── users/<user-id>/images/<media-id>.jpg     ảnh hồ sơ (tối đa 10, ≤ 8 MB, đã nén lại 1600 px, bỏ EXIF)
 ├── users/<user-id>/videos/<media-id>.mp4     video hồ sơ (tối đa 2, ≤ 20 MB, mp4/webm)
+├── users/<user-id>/chat/<media-id>.jpg|mp4   ảnh/video gửi trong tin nhắn (ảnh ≤ 8 MB, video ≤ 20 MB)
 └── site/hero/<media-id>.jpg                  ảnh trang chủ do admin chọn
 ```
+
+### Luồng khi người dùng gửi ảnh/video (hồ sơ hoặc chat)
+
+1. Trình duyệt nén lại ảnh (JPEG, tối đa 1600 px, bỏ EXIF/GPS); video giữ nguyên.
+2. `POST /uploads` → Worker xin database cấp chỗ (`cd_media`, trạng thái `pending`, đường dẫn B2 như trên).
+3. `PUT /uploads/<id>` → Worker kiểm tra dung lượng + định dạng thật của file, rồi **tự đẩy lên Backblaze B2** (ký S3 SigV4, mã hóa SSE-B2) → đánh dấu `ready`.
+4. Với chat: tin nhắn được gửi kèm `mediaId`. Chỉ người gửi, người nhận (nếu không chặn nhau) và admin xem được file đó.
+5. File chat đã tải nhưng không gửi đi sẽ tự xóa khỏi B2 sau 24 giờ (cron 30 phút).
 - Tên file do database cấp (`cd_media.object_key`), người dùng không đặt được đường dẫn.
 - Trình duyệt **không bao giờ** gọi B2 trực tiếp. Ảnh được xem qua `https://<worker>/media/<id>?…&sig=…`: link ký HMAC, gắn với người xem, hết hạn 10 phút; Worker kiểm tra quyền xem (chặn, ẩn, khóa) ở mỗi lần tải.
 - File được mã hóa SSE-B2 (Worker gửi `x-amz-server-side-encryption: AES256`).

@@ -56,7 +56,7 @@ create table public.cd_media (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null references public.cd_profiles(id) on delete cascade,
  kind text not null check(kind in ('image','video')),
- purpose text not null default 'profile' check(purpose in ('profile','hero')),
+ purpose text not null default 'profile' check(purpose in ('profile','hero','chat')),
  mime text not null check(mime in ('image/jpeg','image/png','image/webp','video/mp4','video/webm')),
  bytes integer not null check(bytes>0 and bytes<=20971520),
  object_key text not null unique,
@@ -87,7 +87,8 @@ create table public.cd_messages (
  id uuid primary key default gen_random_uuid(),
  sender_id uuid not null references public.cd_profiles(id) on delete cascade,
  recipient_id uuid not null references public.cd_profiles(id) on delete cascade,
- body text not null check(length(trim(body)) between 1 and 1000),
+ body text not null default '' check(length(body)<=1000),
+ media_id uuid unique references public.cd_media(id) on delete set null,
  created_at timestamptz not null default now(), check(sender_id<>recipient_id)
 );
 create index cd_message_pair on public.cd_messages(sender_id,recipient_id,created_at desc);
@@ -207,7 +208,7 @@ $$;
 -- Sole service API. p_actor MUST come from verified Auth user, never request JSON.
 create function public.cd_api(p_actor uuid, p_action text, p_data jsonb default '{}') returns jsonb
 language plpgsql security invoker set search_path='' as $$
-declare p public.cd_profiles; m public.cd_media; result jsonb; target uuid; media_id uuid;
+declare p public.cd_profiles; m public.cd_media; result jsonb; target uuid; v_media uuid;
  admin boolean; n integer; k text; v_purpose text; loc chich_private.locations; radius integer;
 begin
  if current_user<>'service_role' then raise exception 'Forbidden'; end if;
@@ -216,7 +217,7 @@ begin
   return (select jsonb_build_object('mediaId',s.hero_media_id,'alt',s.hero_alt) from public.cd_settings s where id);
  end if;
  if p_action='cleanup_list' then
-  return coalesce((select jsonb_agg(to_jsonb(x)) from (select id,object_key from public.cd_media where (status in ('pending','uploading') and created_at<now()-interval '1 hour') or status='deleting' limit 100) x),'[]');
+  return coalesce((select jsonb_agg(to_jsonb(x)) from (select id,object_key from public.cd_media md where (status in ('pending','uploading') and created_at<now()-interval '1 hour') or status='deleting' or (purpose='chat' and status='ready' and created_at<now()-interval '24 hours' and not exists(select 1 from public.cd_messages mm where mm.media_id=md.id)) limit 100) x),'[]');
  end if;
  if p_action='cleanup_expired' then
   delete from chich_private.locations where updated_at<now()-interval '24 hours';
@@ -225,7 +226,7 @@ begin
   return '{}';
  end if;
  if p_action='cleanup_done' then
-  delete from public.cd_media where id=(p_data->>'id')::uuid and (status='deleting' or (status in ('pending','uploading') and created_at<now()-interval '1 hour'));
+  delete from public.cd_media md where md.id=(p_data->>'id')::uuid and (md.status='deleting' or (md.status in ('pending','uploading') and md.created_at<now()-interval '1 hour') or (md.purpose='chat' and md.status='ready' and md.created_at<now()-interval '24 hours' and not exists(select 1 from public.cd_messages mm where mm.media_id=md.id)));
   delete from chich_private.locations where updated_at<now()-interval '24 hours';
   return '{}';
  end if;
@@ -309,19 +310,25 @@ begin
   if not chich_private.can_view(p_actor,target) then raise exception 'Hồ sơ không khả dụng.'; end if;
   return (select chich_private.profile_json(q) from public.cd_profiles q where id=target);
  elsif p_action='reserve_media' then
-  perform chich_private.throttle(p_actor,'upload',30,3600);
-  perform pg_advisory_xact_lock(hashtextextended(p_actor::text,0));
   k=p_data->>'kind';v_purpose=coalesce(p_data->>'purpose','profile');
+  if v_purpose='chat' then perform chich_private.throttle(p_actor,'upload_chat',60,3600);
+   if not chich_private.complete(p) then raise exception 'Hãy hoàn thiện hồ sơ trước khi gửi ảnh/video.'; end if;
+  else perform chich_private.throttle(p_actor,'upload',30,3600); end if;
+  perform pg_advisory_xact_lock(hashtextextended(p_actor::text,0));
   if v_purpose='hero' and not admin then raise exception 'Forbidden'; end if;
   if v_purpose='hero' and k<>'image' then raise exception 'Hero phải là ảnh.'; end if;
-  if k is null or k not in ('image','video') or v_purpose not in ('profile','hero') or coalesce(p_data->>'bytes','') !~ '^\d{1,9}$' then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
+  if k is null or k not in ('image','video') or v_purpose not in ('profile','hero','chat') or coalesce(p_data->>'bytes','') !~ '^\d{1,9}$' then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
   if (p_data->>'bytes')::int<1 or (k='image' and ((p_data->>'bytes')::int>8388608 or coalesce(p_data->>'mime','') not in ('image/jpeg','image/png','image/webp'))) or (k='video' and ((p_data->>'bytes')::int>20971520 or coalesce(p_data->>'mime','') not in ('video/mp4','video/webm'))) then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
-  select count(*) into n from public.cd_media where user_id=p_actor and kind=k and cd_media.purpose=v_purpose and status<>'deleting';
-  if n>=(case when v_purpose='hero' then 3 when k='image' then 10 else 2 end) then raise exception 'Đã đạt giới hạn ảnh hoặc video.'; end if;
-  media_id=gen_random_uuid();
-  insert into public.cd_media(id,user_id,kind,purpose,mime,bytes,object_key,position) values(media_id,p_actor,k,v_purpose,p_data->>'mime',(p_data->>'bytes')::int,
-   -- B2 layout: site/hero/<id>.<ext> | users/<uid>/images/<id>.<ext> | users/<uid>/videos/<id>.<ext>
-   case when v_purpose='hero' then 'site/hero/' else 'users/'||p_actor::text||case when k='image' then '/images/' else '/videos/' end end||media_id::text||'.'||case p_data->>'mime' when 'image/jpeg' then 'jpg' when 'image/png' then 'png' when 'image/webp' then 'webp' when 'video/mp4' then 'mp4' else 'webm' end,n) returning * into m;
+  if v_purpose='chat' then
+   n=0; -- chat attachments: no album cap; limited by size + upload_chat throttle; unsent files are purged after 24h
+  else
+   select count(*) into n from public.cd_media where user_id=p_actor and kind=k and cd_media.purpose=v_purpose and status<>'deleting';
+   if n>=(case when v_purpose='hero' then 3 when k='image' then 10 else 2 end) then raise exception 'Đã đạt giới hạn ảnh hoặc video.'; end if;
+  end if;
+  v_media=gen_random_uuid();
+  insert into public.cd_media(id,user_id,kind,purpose,mime,bytes,object_key,position) values(v_media,p_actor,k,v_purpose,p_data->>'mime',(p_data->>'bytes')::int,
+   -- B2 layout: site/hero/<id>.<ext> | users/<uid>/images|videos/<id>.<ext> | users/<uid>/chat/<id>.<ext>
+   case when v_purpose='hero' then 'site/hero/' when v_purpose='chat' then 'users/'||p_actor::text||'/chat/' else 'users/'||p_actor::text||case when k='image' then '/images/' else '/videos/' end end||v_media::text||'.'||case p_data->>'mime' when 'image/jpeg' then 'jpg' when 'image/png' then 'png' when 'image/webp' then 'webp' when 'video/mp4' then 'mp4' else 'webm' end,n) returning * into m;
   return to_jsonb(m);
  elsif p_action='claim_media' then
   update public.cd_media set status='uploading' where id=(p_data->>'id')::uuid and user_id=p_actor and status='pending' and created_at>now()-interval '15 minutes' returning * into m;
@@ -335,20 +342,25 @@ begin
   update public.cd_settings set hero_media_id=null where hero_media_id=m.id;
   return to_jsonb(m);
  elsif p_action='edit_media' then
-  media_id=(p_data->>'id')::uuid;
+  v_media=(p_data->>'id')::uuid;
   perform pg_advisory_xact_lock(hashtextextended(p_actor::text,0));
-  select * into m from public.cd_media where id=media_id and user_id=p_actor and purpose='profile' and status='ready';
+  select * into m from public.cd_media where id=v_media and user_id=p_actor and purpose='profile' and status='ready';
   if m.id is null then raise exception 'Không tìm thấy ảnh/video.'; end if;
   if coalesce((p_data->>'cover')::boolean,false) then
    if m.kind<>'image' then raise exception 'Ảnh đại diện phải là hình ảnh.'; end if;
    update public.cd_media set position=position+1 where user_id=p_actor and purpose='profile';
-   update public.cd_media set position=0 where id=media_id;
+   update public.cd_media set position=0 where id=v_media;
   end if;
-  if p_data ? 'caption' then update public.cd_media set caption=left(coalesce(p_data->>'caption',''),120) where id=media_id; end if;
+  if p_data ? 'caption' then update public.cd_media set caption=left(coalesce(p_data->>'caption',''),120) where id=v_media; end if;
   return '{}';
  elsif p_action='media_file' then
   select * into m from public.cd_media where id=(p_data->>'id')::uuid and status='ready';
-  if m.id is null or (not admin and (m.purpose='hero' or not chich_private.can_view(p_actor,m.user_id))) then raise exception 'Không tìm thấy ảnh/video.'; end if; return to_jsonb(m);
+  if m.id is null or (not admin and (
+     m.purpose='hero'
+     or (m.purpose='profile' and not chich_private.can_view(p_actor,m.user_id))
+     -- chat attachment: only the sender, or the recipient of the message carrying it (and not blocked)
+     or (m.purpose='chat' and m.user_id<>p_actor and not exists(select 1 from public.cd_messages mm where mm.media_id=m.id and mm.recipient_id=p_actor and not chich_private.is_blocked(p_actor,mm.sender_id)))
+  )) then raise exception 'Không tìm thấy ảnh/video.'; end if; return to_jsonb(m);
 
  -- ===================== Admin console (single admin by email) =====================
  elsif p_action like 'admin\_%' then
@@ -372,7 +384,8 @@ begin
      'blocks',(select count(*) from public.cd_blocks),
      'openReports',(select count(*) from public.cd_reports where not resolved),
      'nearby',(select count(*) from chich_private.locations where updated_at>now()-interval '24 hours'),
-     'installed',(select count(*) from chich_private.accounts where app_installed_at is not null)),
+     'installed',(select count(*) from chich_private.accounts where app_installed_at is not null),
+     'chatMedia',(select count(*) from public.cd_media where purpose='chat' and status='ready')),
     'signups',chich_private.daily('signup'),
     'active',chich_private.daily('active'),
     'messagesDaily',chich_private.daily('message'),
@@ -420,20 +433,21 @@ begin
    target=nullif(p_data->>'userId','')::uuid;
    return coalesce((select jsonb_agg(to_jsonb(x) order by x.last_at desc) from (
     select c.a,c.b,c.n,c.last_at,c.preview,pa.name a_name,pb.name b_name,chich_private.auth_email(c.a) a_email,chich_private.auth_email(c.b) b_email from (
-     select least(sender_id,recipient_id) a,greatest(sender_id,recipient_id) b,count(*) n,max(created_at) last_at,left((array_agg(body order by created_at desc))[1],140) preview
-     from public.cd_messages where target is null or target in (sender_id,recipient_id) group by 1,2) c
+     select least(sender_id,recipient_id) a,greatest(sender_id,recipient_id) b,count(*) n,max(created_at) last_at,left((array_agg(case when cm.body='' and cm.media_id is not null then '[Ảnh/video]' else cm.body end order by cm.created_at desc))[1],140) preview
+     from public.cd_messages cm where target is null or target in (cm.sender_id,cm.recipient_id) group by 1,2) c
     join public.cd_profiles pa on pa.id=c.a join public.cd_profiles pb on pb.id=c.b
     order by c.last_at desc limit 50 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
   elsif p_action='admin_messages' then
-   target=(p_data->>'a')::uuid;media_id=(p_data->>'b')::uuid;
-   insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'view_chat',target,jsonb_build_object('with',media_id));
-   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select id,sender_id,recipient_id,body,created_at from public.cd_messages
-    where (sender_id=target and recipient_id=media_id) or (sender_id=media_id and recipient_id=target) order by created_at desc limit 1000) x),'[]');
+   target=(p_data->>'a')::uuid;v_media=(p_data->>'b')::uuid;
+   insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'view_chat',target,jsonb_build_object('with',v_media));
+   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
+    from public.cd_messages mm left join public.cd_media md on md.id=mm.media_id and md.status='ready'
+    where (mm.sender_id=target and mm.recipient_id=v_media) or (mm.sender_id=v_media and mm.recipient_id=target) order by mm.created_at desc limit 1000) x),'[]');
   elsif p_action='admin_media' then
    return jsonb_build_object('media',coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (
     select md.id,md.user_id,md.kind,md.mime,md.bytes,md.caption,md.status,md.purpose,md.created_at,q.name owner_name,chich_private.auth_email(md.user_id) owner_email
     from public.cd_media md join public.cd_profiles q on q.id=md.user_id
-    where md.status='ready' and (coalesce(p_data->>'kind','all')='all' or md.kind=p_data->>'kind')
+    where md.status='ready' and md.purpose<>'hero' and (coalesce(p_data->>'kind','all')='all' or md.kind=p_data->>'kind') and (coalesce(p_data->>'purpose','all')='all' or md.purpose=p_data->>'purpose')
     order by md.created_at desc limit 60 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]'));
   elsif p_action='admin_activity' then
    target=nullif(p_data->>'userId','')::uuid;
@@ -493,8 +507,10 @@ begin
    insert into public.cd_reports(reporter_id,target_id,reason,note) values(p_actor,target,trim(p_data->>'reason'),left(coalesce(p_data->>'note',''),500));
   else
    if not chich_private.complete(p) then raise exception 'Hãy hoàn thiện hồ sơ trước khi gửi lời chào.';end if;
-   if coalesce(length(trim(p_data->>'text')),0) not between 1 and 1000 then raise exception 'Tin nhắn cần từ 1 đến 1000 ký tự.';end if;
-   insert into public.cd_messages(sender_id,recipient_id,body) values(p_actor,target,trim(p_data->>'text'));
+   v_media=nullif(p_data->>'mediaId','')::uuid;
+   if v_media is not null and not exists(select 1 from public.cd_media where id=v_media and user_id=p_actor and purpose='chat' and status='ready') then raise exception 'Ảnh/video đính kèm không hợp lệ hoặc chưa tải xong.';end if;
+   if coalesce(length(trim(p_data->>'text')),0)>1000 or (v_media is null and coalesce(length(trim(p_data->>'text')),0)=0) then raise exception 'Tin nhắn cần từ 1 đến 1000 ký tự.';end if;
+   insert into public.cd_messages(sender_id,recipient_id,body,media_id) values(p_actor,target,coalesce(trim(p_data->>'text'),''),v_media);
   end if; return '{}';
  elsif p_action='liked' then
   return coalesce((select jsonb_agg(chich_private.profile_json(q)) from public.cd_profiles q join public.cd_likes l on l.target_id=q.id where l.user_id=p_actor and chich_private.can_view(p_actor,q.id)),'[]');
@@ -505,7 +521,9 @@ begin
  elsif p_action='messages' then
   target=(p_data->>'id')::uuid;
   if not chich_private.can_view(p_actor,target) then raise exception 'Cuộc trò chuyện không khả dụng.';end if;
-  return coalesce((select jsonb_agg(to_jsonb(a) order by a.created_at) from (select id,sender_id,body,created_at from public.cd_messages where (sender_id=p_actor and recipient_id=target) or (sender_id=target and recipient_id=p_actor) order by created_at desc limit 100) a),'[]');
+  return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
+    from public.cd_messages mm left join public.cd_media md on md.id=mm.media_id and md.status='ready'
+    where (mm.sender_id=p_actor and mm.recipient_id=target) or (mm.sender_id=target and mm.recipient_id=p_actor) order by mm.created_at desc limit 100) x),'[]');
  end if;
  raise exception 'Unknown action';
 end $$;

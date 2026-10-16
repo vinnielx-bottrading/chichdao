@@ -17,7 +17,9 @@ export function allowedOrigin(origin,env){return (env.ALLOWED_ORIGINS||'').split
 export const SUPABASE_VARS=['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'],APP_VARS=['ALLOWED_ORIGINS','MEDIA_SIGNING_SECRET'],B2_VARS=['B2_BUCKET','B2_REGION','B2_KEY_ID','B2_APPLICATION_KEY'];
 export function validConfig(env){return [...SUPABASE_VARS,...APP_VARS].every(k=>env[k]);}
 export function storageMode(env){return B2_VARS.every(k=>env[k])?'b2':'';}
-export function b2Endpoint(env){return (env.B2_ENDPOINT||`https://s3.${env.B2_REGION}.backblazeb2.com`).replace(/\/+$/,'');}
+// B2_REGION may be "ca-east-006" or the full endpoint "s3.ca-east-006.backblazeb2.com" / "https://s3.ca-east-006.backblazeb2.com".
+export function b2Region(env){const v=String(env.B2_REGION||'').trim().replace(/^https?:\/\//,'').replace(/\/+$/,'');const m=v.match(/^s3\.([a-z0-9-]+)\.backblazeb2\.com$/i);return (m?m[1]:v).toLowerCase();}
+export function b2Endpoint(env){return (env.B2_ENDPOINT||`https://s3.${b2Region(env)}.backblazeb2.com`).replace(/\/+$/,'');}
 export async function boundedBody(request,max){
  const declared=Number(request.headers.get('content-length'));
  if(declared>max)throw new HttpError(413,'File vượt giới hạn dung lượng.');
@@ -81,7 +83,7 @@ export async function hydrate(data,viewer,origin,env){
 // Object layout: users/<uid>/images/<id>.jpg · users/<uid>/videos/<id>.mp4 · site/hero/<id>.jpg
 function b2URL(env,key){const base=new URL(b2Endpoint(env));if(base.protocol!=='https:'||!base.hostname.endsWith('.backblazeb2.com'))throw new HttpError(503,'Kho ảnh chưa sẵn sàng.');return `${base.origin}/${encodeURIComponent(env.B2_BUCKET)}/${key.split('/').map(encodeURIComponent).join('/')}`;}
 async function b2(env,key,method,body,headers={}){
- const client=new AwsClient({accessKeyId:env.B2_KEY_ID,secretAccessKey:env.B2_APPLICATION_KEY,region:env.B2_REGION,service:'s3'});
+ const client=new AwsClient({accessKeyId:env.B2_KEY_ID,secretAccessKey:env.B2_APPLICATION_KEY,region:b2Region(env),service:'s3'});
  return client.fetch(b2URL(env,key),{method,headers,body});
 }
 function requireStorage(env){const mode=storageMode(env);if(!mode)throw new HttpError(503,'Kho ảnh/video chưa được cấu hình. Vui lòng thử lại sau.');return mode;}

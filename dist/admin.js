@@ -15,7 +15,7 @@ const ev=e=>EVENTS[e]||e;
 const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['audit','Nhật ký admin'],['settings','Cài đặt']];
 
 let me=null,tab='overview',charts=[],stats=null,authBusy=false,lastToken='';
-const state={users:{q:'',filter:'all',rows:[],done:false},media:{kind:'all',rows:[],done:false},activity:{event:'all',rows:[],done:false},chats:{rows:[],a:'',b:'',done:false}};
+const state={users:{q:'',filter:'all',rows:[],done:false},media:{kind:'all',purpose:'all',rows:[],done:false},activity:{event:'all',rows:[],done:false},chats:{rows:[],a:'',b:'',done:false}};
 
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),4500);}
 function gate(text,showLogin=true){$('#shell').hidden=true;$('#gate').hidden=false;$('#gate-text').textContent=text;$('#gate-actions').hidden=!showLogin;}
@@ -79,7 +79,7 @@ async function overview(){
  const AGE=['18–24','25–29','30–34','35–39','40–49','50+','Chưa có'];stats.age=[...(stats.age||[])].sort((x,y)=>AGE.indexOf(x.label)-AGE.indexOf(y.label));
  const k=(label,value,sub='')=>`<div class="kpi"><span>${label}</span><b>${num(value)}</b>${sub?`<small>${sub}</small>`:''}</div>`;
  $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">TỔNG QUAN</span><h1>Bảng điều khiển</h1><p>Số liệu thời gian thực từ cơ sở dữ liệu · 30 ngày gần nhất theo giờ Việt Nam.</p></div><button class="btn" id="refresh">Làm mới</button></div>
- <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}${k('Đã cài app',t.installed)}</div>
+ <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}${k('Đã cài app',t.installed)}${k('Ảnh/video trong chat',t.chatMedia)}</div>
  <div class="grid">
   ${chartCard('c-signups','Đăng ký mới theo ngày','Hồ sơ được tạo, 30 ngày',stats.signups)}
   ${chartCard('c-active','Người dùng hoạt động theo ngày','Số tài khoản có hoạt động mỗi ngày',stats.active)}
@@ -168,7 +168,7 @@ async function userDetail(id,sub='profile'){
 }
 function tile(m){
  const thumb=m.src?(m.kind==='video'?`<video src="${safeURL(m.src)}" preload="metadata" muted playsinline></video>`:`<img src="${safeURL(m.src)}" alt="${esc(m.caption||'Ảnh người dùng')}" loading="lazy">`):`<span class="noimg">${m.status&&m.status!=='ready'?esc(m.status):'Chưa có kho ảnh'}</span>`;
- return `<article class="tile"><button class="thumb" ${m.src?`data-view="${m.id}"`:''} aria-label="Xem lớn">${thumb}</button><div class="meta"><b>${esc(m.owner_name||m.caption||(m.kind==='video'?'Video':'Ảnh'))}</b>${m.owner_email?`<button class="link" style="text-align:left;padding:0" data-user="${m.user_id}">${esc(m.owner_email)}</button>`:''}<span class="faint">${m.kind==='video'?'Video':'Ảnh'} · ${bytes(m.bytes)} · ${dt(m.created_at||m.createdAt)}</span>${m.caption&&m.owner_name?`<span class="muted">${esc(m.caption)}</span>`:''}${m.status==='ready'||!m.status?`<button class="link" style="text-align:left;padding:0;color:var(--bad)" data-del="${m.id}">Xóa</button>`:''}</div></article>`;
+ return `<article class="tile"><button class="thumb" ${m.src?`data-view="${m.id}"`:''} aria-label="Xem lớn">${thumb}</button><div class="meta"><b>${esc(m.owner_name||m.caption||(m.kind==='video'?'Video':'Ảnh'))}</b>${m.owner_email?`<button class="link" style="text-align:left;padding:0" data-user="${m.user_id}">${esc(m.owner_email)}</button>`:''}<span class="faint">${m.purpose==='chat'?'<span class="tag hot">Chat</span>':''}${m.kind==='video'?'Video':'Ảnh'} · ${bytes(m.bytes)} · ${dt(m.created_at||m.createdAt)}</span>${m.caption&&m.owner_name?`<span class="muted">${esc(m.caption)}</span>`:''}${m.status==='ready'||!m.status?`<button class="link" style="text-align:left;padding:0;color:var(--bad)" data-del="${m.id}">Xóa</button>`:''}</div></article>`;
 }
 const mediaIndex=new Map();
 function registerMedia(list){(list||[]).forEach(m=>mediaIndex.set(m.id,m));}
@@ -178,7 +178,7 @@ function activityTable(rows,withUser=true){
 function reportList(list){return `<div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Lý do</th><th>Mô tả</th><th>Trạng thái</th></tr></thead><tbody>${list.map(r=>`<tr><td>${dt(r.created_at)}</td><td>${esc(r.reason)}</td><td class="wrap">${esc(r.note||'—')}</td><td>${r.resolved?'<span class="tag">Đã đóng</span>':'<span class="tag hot">Đang mở</span>'}</td></tr>`).join('')}</tbody></table></div>`;}
 async function thread(a,b,el,names={}){
  el.innerHTML=empty('Đang tải…');const list=await api('admin_messages',{a,b});
- el.innerHTML=list.map(m=>`<div class="bubble ${m.sender_id===a?'':'right'}">${esc(m.body)}<small>${esc(names[m.sender_id]||(m.sender_id===a?'A':'B'))} · ${dt(m.created_at)}</small></div>`).join('')||empty('Không có tin nhắn.');el.scrollTop=el.scrollHeight;
+ list.forEach(m=>registerMedia(m.media));el.innerHTML=list.map(m=>`<div class="bubble ${m.sender_id===a?'':'right'}">${(m.media||[]).map(x=>x.src?`<button class="chat-thumb" data-view="${x.id}">${x.kind==='video'?`<video src="${safeURL(x.src)}" preload="metadata" muted playsinline></video>`:`<img src="${safeURL(x.src)}" alt="Ảnh trong tin nhắn" loading="lazy">`}</button>`:'<span class="faint">[Ảnh/video đã xóa]</span>').join('')}${esc(m.body)}<small>${esc(names[m.sender_id]||(m.sender_id===a?'A':'B'))} · ${dt(m.created_at)}</small></div>`).join('')||empty('Không có tin nhắn.');el.scrollTop=el.scrollHeight;
 }
 
 /* ---------------- Chats ---------------- */
@@ -194,9 +194,9 @@ async function chats(reset){
 /* ---------------- Media ---------------- */
 async function media(reset){
  const s=state.media;
- if(reset){s.rows=[];s.done=false;$('#view').innerHTML=`<div class="head"><div><span class="eyebrow">THƯ VIỆN</span><h1>Ảnh & video người dùng</h1><p>Mới nhất trước. Liên kết xem có hiệu lực 10 phút.</p></div><div class="toolbar"><select id="m-k" aria-label="Loại"><option value="all">Tất cả</option><option value="image">Ảnh</option><option value="video">Video</option></select></div></div><div class="media-grid" id="m-grid"></div><button class="btn more" id="m-more" hidden>Xem thêm</button>`;
-  $('#m-k').value=s.kind;$('#m-k').onchange=e=>{s.kind=e.target.value;media(true);};$('#m-more').onclick=()=>media(false);}
- const r=await api('admin_media',{kind:s.kind,offset:s.rows.length});registerMedia(r.media);s.rows.push(...r.media);s.done=r.media.length<60;
+ if(reset){s.rows=[];s.done=false;$('#view').innerHTML=`<div class="head"><div><span class="eyebrow">THƯ VIỆN</span><h1>Ảnh & video người dùng</h1><p>Mới nhất trước. Liên kết xem có hiệu lực 10 phút.</p></div><div class="toolbar"><select id="m-p" aria-label="Nguồn"><option value="all">Hồ sơ + chat</option><option value="profile">Ảnh hồ sơ</option><option value="chat">Gửi trong chat</option></select><select id="m-k" aria-label="Loại"><option value="all">Tất cả</option><option value="image">Ảnh</option><option value="video">Video</option></select></div></div><div class="media-grid" id="m-grid"></div><button class="btn more" id="m-more" hidden>Xem thêm</button>`;
+  $('#m-k').value=s.kind;$('#m-k').onchange=e=>{s.kind=e.target.value;media(true);};$('#m-p').value=s.purpose;$('#m-p').onchange=e=>{s.purpose=e.target.value;media(true);};$('#m-more').onclick=()=>media(false);}
+ const r=await api('admin_media',{kind:s.kind,purpose:s.purpose,offset:s.rows.length});registerMedia(r.media);s.rows.push(...r.media);s.done=r.media.length<60;
  $('#m-grid').innerHTML=s.rows.map(tile).join('')||empty('Chưa có ảnh/video.');$('#m-more').hidden=s.done;
 }
 

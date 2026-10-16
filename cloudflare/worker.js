@@ -304,8 +304,13 @@ function validConfig(env) {
 function storageMode(env) {
   return B2_VARS.every((k) => env[k]) ? "b2" : "";
 }
+function b2Region(env) {
+  const v = String(env.B2_REGION || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const m = v.match(/^s3\.([a-z0-9-]+)\.backblazeb2\.com$/i);
+  return (m ? m[1] : v).toLowerCase();
+}
 function b2Endpoint(env) {
-  return (env.B2_ENDPOINT || `https://s3.${env.B2_REGION}.backblazeb2.com`).replace(/\/+$/, "");
+  return (env.B2_ENDPOINT || `https://s3.${b2Region(env)}.backblazeb2.com`).replace(/\/+$/, "");
 }
 async function boundedBody(request, max) {
   const declared = Number(request.headers.get("content-length"));
@@ -412,7 +417,7 @@ function b2URL(env, key) {
   return `${base.origin}/${encodeURIComponent(env.B2_BUCKET)}/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 async function b2(env, key, method, body, headers = {}) {
-  const client = new AwsClient({ accessKeyId: env.B2_KEY_ID, secretAccessKey: env.B2_APPLICATION_KEY, region: env.B2_REGION, service: "s3" });
+  const client = new AwsClient({ accessKeyId: env.B2_KEY_ID, secretAccessKey: env.B2_APPLICATION_KEY, region: b2Region(env), service: "s3" });
   return client.fetch(b2URL(env, key), { method, headers, body });
 }
 function requireStorage(env) {
@@ -581,6 +586,7 @@ export {
   SUPABASE_VARS,
   allowedOrigin,
   b2Endpoint,
+  b2Region,
   boundedBody,
   index_default as default,
   deviceLabel,

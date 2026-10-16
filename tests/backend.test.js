@@ -52,7 +52,19 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  await assert.rejects(()=>rpc(uid,'profile_save',{name:'A'}),/18–80/);
  await assert.rejects(()=>rpc(uid,'reserve_media',{kind:'video',bytes:20971521,mime:'video/mp4'}),/không hợp lệ/);
  await rpc(uid,'send',{id:other,text:'Xin chào'});
- assert.equal((await rpc(other,'messages',{id:uid})).length,1);
+ // Chat attachment: stored under users/<uid>/chat/, visible only to sender + recipient
+ const cm=await rpc(uid,'reserve_media',{kind:'image',purpose:'chat',bytes:15,mime:'image/jpeg'});
+ assert.match(cm.object_key,new RegExp(`^users/${uid}/chat/${cm.id}\\.jpg$`));
+ await assert.rejects(()=>rpc(uid,'send',{id:other,mediaId:cm.id}),/chưa tải xong/);
+ await rpc(uid,'claim_media',{id:cm.id});await rpc(uid,'finish_media',{id:cm.id});
+ await assert.rejects(()=>rpc(other,'send',{id:uid,mediaId:cm.id}),/không hợp lệ/);
+ await assert.rejects(()=>rpc(other,'media_file',{id:cm.id}),/Không tìm/);
+ await rpc(uid,'send',{id:other,mediaId:cm.id});
+ const thread=await rpc(other,'messages',{id:uid});assert.equal(thread.length,2);assert.equal(thread[1].media[0].id,cm.id);assert.equal(thread[1].body,'');
+ assert.equal((await rpc(other,'media_file',{id:cm.id})).id,cm.id);
+ await assert.rejects(()=>rpc(third,'media_file',{id:cm.id}),/Không tìm/);
+ assert.equal((await rpc(uid,'me')).photos.length,12);
+ assert.equal((await rpc(other,'messages',{id:uid})).length,2);
  assert.equal((await rpc(third,'messages',{id:uid})).length,0);
  await rpc(other,'block',{id:uid});
  await assert.rejects(async()=>rpc(uid,'media_file',{id:(await rpc(other,'me')).photos[0].id}),/Không tìm/);
@@ -74,7 +86,7 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  assert.equal((await rpc(uid,'me')).appInstalled,false);await rpc(uid,'app_installed',{_geo:{country:'VN'}});assert.equal((await rpc(uid,'me')).appInstalled,true);
  assert.match((await rpc(uid,'reserve_media',{kind:'video',bytes:15,mime:'video/webm'}).catch(e=>({object_key:e.message}))).object_key,/giới hạn|^users\/.+\/videos\/.+\.webm$/);
  const stats=await rpc(adminId,'admin_stats');
- assert.equal(stats.totals.users,4);assert.equal(stats.totals.installed,1);assert.equal(stats.totals.messages,1);assert.equal(stats.signups.length,30);
+ assert.equal(stats.totals.users,4);assert.equal(stats.totals.installed,1);assert.equal(stats.totals.messages,2);assert.equal(stats.totals.chatMedia,1);assert.equal(stats.signups.length,30);
  assert.ok(stats.geoCity.some(x=>x.label==='Hanoi'));
  const users=await rpc(adminId,'admin_users',{query:'b@example'});
  assert.equal(users.length,1);assert.equal(users[0].email,'b@example.test');
@@ -123,7 +135,7 @@ test('worker helpers: nested media signing, optional storage, device label',asyn
  const out=await hydrate({profile:{photos:[{id:uid,kind:'image'}]},media:[{id:other,status:'pending'}]},third,'https://api.test',env);
  assert.match(out.profile.photos[0].src,/^https:\/\/api\.test\/media\//);
  assert.equal(out.media[0].src,undefined);
- assert.equal(storageMode({}),'');assert.equal(storageMode({B2_BUCKET:'b',B2_REGION:'us-west-004',B2_KEY_ID:'k',B2_APPLICATION_KEY:'s'}),'b2');assert.equal(b2Endpoint({B2_REGION:'us-west-004'}),'https://s3.us-west-004.backblazeb2.com');
+ assert.equal(storageMode({}),'');assert.equal(storageMode({B2_BUCKET:'b',B2_REGION:'us-west-004',B2_KEY_ID:'k',B2_APPLICATION_KEY:'s'}),'b2');assert.equal(b2Endpoint({B2_REGION:'us-west-004'}),'https://s3.us-west-004.backblazeb2.com');assert.equal(b2Endpoint({B2_REGION:'s3.ca-east-006.backblazeb2.com'}),'https://s3.ca-east-006.backblazeb2.com');assert.equal(b2Endpoint({B2_REGION:'https://s3.ca-east-006.backblazeb2.com/'}),'https://s3.ca-east-006.backblazeb2.com');
  assert.equal(deviceLabel('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit Version/17 Mobile Safari/604.1'),'iOS · Safari');
  const core={SUPABASE_URL:'x',SUPABASE_SERVICE_ROLE_KEY:'x',MEDIA_SIGNING_SECRET:'x',ALLOWED_ORIGINS:'https://a.test'};
  const health=await (await worker.fetch(new Request('https://api.test/health'),core)).json();
@@ -131,7 +143,7 @@ test('worker helpers: nested media signing, optional storage, device label',asyn
 });
 test('upload goes to Backblaze B2 with SigV4, SSE and the users/<uid>/images layout',async()=>{
  const mediaId='55555555-5555-4555-8555-555555555555',key=`users/${uid}/images/${mediaId}.jpg`,jpeg=Uint8Array.from([255,216,255,224,0,0,0,0,0,0,0,0,1,2,3,4]);
- const env={SUPABASE_URL:'https://db.test',SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x',MEDIA_SIGNING_SECRET:'a-secure-test-secret-32-characters',ALLOWED_ORIGINS:'https://app.test',B2_BUCKET:'chich-media',B2_REGION:'us-west-004',B2_KEY_ID:'kid',B2_APPLICATION_KEY:'secret'};
+ const env={SUPABASE_URL:'https://db.test',SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x',MEDIA_SIGNING_SECRET:'a-secure-test-secret-32-characters',ALLOWED_ORIGINS:'https://app.test',B2_BUCKET:'chich-media',B2_REGION:'s3.us-west-004.backblazeb2.com',B2_KEY_ID:'kid',B2_APPLICATION_KEY:'secret'};
  const calls=[];const real=globalThis.fetch;
  globalThis.fetch=async(input,init={})=>{const req=input instanceof Request?input:new Request(input,init);calls.push(req);
   if(req.url.endsWith('/auth/v1/user'))return Response.json({id:uid});

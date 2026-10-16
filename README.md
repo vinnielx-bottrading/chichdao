@@ -80,7 +80,7 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 - Mặc định **2 video**, mỗi video tối đa **20 MB**, MP4/WebM. Không tự chuyển mã video; khả năng phát tùy codec trình duyệt. Có thể điều chỉnh hạn mức trong SQL và giao diện.
 - Giới hạn số file được thực thi dưới transaction và advisory lock theo tài khoản. Slot đang tải cũng tính vào hạn mức. Slot lỗi được dọn, không cho tải đè slot đã hoàn thành.
 - Album hỗ trợ xem lớn ảnh/video, chú thích, chọn ảnh đại diện, xóa. Đặt video làm avatar bị từ chối.
-- Tin nhắn thật lưu trong DB; hiện tải khi mở cuộc trò chuyện hoặc bấm Làm mới. Chưa có WebSocket, push notification hoặc xác nhận đã đọc.
+- Tin nhắn lưu trong DB, gửi kèm được 1 ảnh (≤ 8 MB) hoặc video (≤ 20 MB) mỗi tin; file tự lưu lên Backblaze B2 tại `users/<uid>/chat/`, chỉ người gửi/nhận và admin xem được. Hiện tải khi mở cuộc trò chuyện hoặc bấm Làm mới. Chưa có WebSocket, push notification hoặc xác nhận đã đọc.
 - Tìm ở gần: chỉ lấy GPS sau thao tác cho phép, làm tròn tọa độ đến 0,01 độ; chọn 5/10/25/50/100 km. Chỉ trả nhóm khoảng cách, không trả tọa độ, không sắp xếp theo mét chính xác. Vị trí hết hiệu lực sau 24 giờ, cron xóa bản ghi hết hạn; người dùng tắt để xóa ngay.
 - Tìm ở gần dùng Haversine trong PostgreSQL với bộ lọc vĩ độ trước khi tính. Sai số do làm tròn có thể ảnh hưởng hồ sơ sát ranh giới bán kính. Cần chuyển sang PostGIS/GiST khi lượng dữ liệu lớn.
 - Tuổi, nghề nghiệp, vóc dáng là thông tin tự khai. Google login không chứng minh người dùng đủ 18 tuổi hoặc xác minh ngoại hình/nghề nghiệp.
