@@ -31,7 +31,7 @@ async function onAuth(event,session){
   if(event==='TOKEN_REFRESHED'&&!$('#shell').hidden)return;
   $('#gate').hidden=true;$('#shell').hidden=false;$('#who').textContent=session.user.email||'';$('#gate-status').textContent='';
   route();
- }catch(e){gate('Không mở được trang quản trị.');$('#gate-status').textContent=e.message;}
+ }catch(e){lastToken=session.access_token;gate('Không mở được trang quản trị.',false);$('#gate-status').innerHTML=`${esc(/Unknown action|Unauthenticated/.test(e.message)?'Máy chủ chưa sẵn sàng (database chưa cập nhật).':e.message)}<br><button class="btn" id="gate-out" style="margin-top:10px">Đăng xuất / đổi tài khoản</button>`;$('#gate-out').onclick=()=>signOut();}
  finally{authBusy=false;}
 }
 $('#g-google').onclick=async()=>{$('#gate-status').textContent='';try{await signIn();}catch(e){$('#gate-status').textContent=e.message;}};
