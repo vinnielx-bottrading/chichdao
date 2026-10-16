@@ -1,4 +1,4 @@
-# CHI.CH DAO. — v0.3
+# CHI.CH DAO. — v0.4
 
 Ứng dụng hẹn hò nam–nam 18+. Frontend giữ thiết kế navy/cam, backend dùng **Supabase Auth + PostgreSQL**, **Cloudflare Worker**, **Backblaze B2 private bucket**.
 
@@ -39,11 +39,12 @@ Package không gồm lịch sử Git, `node_modules`, dữ liệu người dùng
 | Đường dẫn | Nội dung |
 | --- | --- |
 | `dist/index.html`, `dist/app.js`, `dist/styles.css` | Giao diện và luồng người dùng |
+| `dist/admin.html`, `dist/admin.js`, `dist/admin.css` | Trang quản trị: thống kê biểu đồ, người dùng, ảnh/video, tin nhắn, hoạt động, báo cáo, nhật ký admin, tạo/đổi email/mật khẩu |
 | `dist/config.js` | URL Supabase, publishable key, URL Worker; chỉ dữ liệu công khai |
 | `src/api.js` | Supabase SDK/Google PKCE và client API |
 | `dist/api.js` | Bundle SDK chạy trên trình duyệt, sinh từ `npm run build` |
 | `worker/index.js` | Cloudflare API, kiểm tra phiên, ký request B2, ảnh/video |
-| `worker/wrangler.toml` | Cấu hình Worker và lịch dọn dữ liệu mỗi 30 phút |
+| `cloudflare/worker.js`, `cloudflare/wrangler.toml` | Worker đóng gói 1 file + cấu hình; xem `cloudflare/HUONG-DAN.md` |
 | `worker/.dev.vars.example` | Mẫu cấu hình; không chứa thông tin tài khoản thật |
 | `supabase/schema.sql` | Schema PostgreSQL thực thi, không phải bản SQLite cũ |
 | `tests/backend.test.js` | Kiểm tra schema trên PostgreSQL WASM/PGlite và Worker |
@@ -88,7 +89,7 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 
 Tất cả bảng bật RLS. `anon` và `authenticated` **không có quyền truy cập trực tiếp** các bảng ứng dụng hoặc RPC. Chỉ Worker được giữ service-role key. Worker xác thực token bằng Supabase `/auth/v1/user`, lấy ID từ kết quả xác thực, không nhận ID người thao tác từ client. RPC `cd_api` chỉ cho `service_role` và kiểm tra sở hữu/quyền theo từng thao tác. Các hàm đều `SECURITY INVOKER`, cố định `search_path`.
 
-Quyền quản trị nằm trong bảng riêng `chich_private.accounts`; không đọc quyền từ `user_metadata` hay tham số trình duyệt. Không có API để tự nâng quyền. Vị trí và dữ liệu quản trị nằm trong schema riêng, không expose qua Data API.
+Quyền quản trị gắn với một email duy nhất trong `chich_private.settings` (mặc định `vinnielx@gmail.com`), so với email đã xác thực của Supabase Auth; không đọc quyền từ `user_metadata` hay tham số trình duyệt. Trang quản trị: `dist/admin.html`. Mọi truy cập dữ liệu riêng tư và thay đổi của admin được ghi vào `chich_private.admin_audit`. Vị trí và dữ liệu quản trị nằm trong schema riêng, không expose qua Data API.
 
 B2 bucket phải private. Link media có chữ ký HMAC, gắn file + người xem, hết hạn sau 10 phút. Worker kiểm tra lại hiển thị, trạng thái tài khoản và chặn mỗi lần phục vụ file. Link còn hiệu lực có thể được chia sẻ cho người khác trong thời gian đó; đây không phải DRM. Khi ảnh hết hạn, mở lại hồ sơ để lấy link mới. Ảnh hero được chọn là tài nguyên công khai qua một route riêng.
 

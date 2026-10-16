@@ -1,4 +1,4 @@
-CHI.CH DAO. GitHub export v0.3
-Source commit: b30cd993d8137737f16dd935f9050eb0fa675399
-Frontend entry: dist/index.html
-Backend services: configuration required; see README.md
+CHI.CH DAO. export v0.4
+Frontend entry: dist/index.html · Admin: dist/admin.html
+API Worker (single file): cloudflare/worker.js · Guide: cloudflare/HUONG-DAN.md
+Database: supabase/schema.sql (run once on project oignkueulvvdfhgcvguv)

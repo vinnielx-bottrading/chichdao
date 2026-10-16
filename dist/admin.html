@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#101d2d">
+  <title>Quản trị — CHI.CH DAO.</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <div id="gate" class="gate">
+    <div class="gate-card">
+      <img src="assets/logo.png" alt="CHI.CH DAO." class="gate-logo">
+      <span class="eyebrow">TRANG QUẢN TRỊ</span>
+      <h1>Đăng nhập quản trị</h1>
+      <p id="gate-text" class="muted">Chỉ tài khoản quản trị viên được truy cập.</p>
+      <div id="gate-actions">
+        <button id="g-google" class="btn primary wide">Đăng nhập với Google</button>
+        <form id="g-email" class="stack">
+          <label for="g-mail">Email</label><input id="g-mail" name="email" type="email" autocomplete="username" required>
+          <label for="g-pass">Mật khẩu</label><input id="g-pass" name="password" type="password" autocomplete="current-password" required>
+          <button class="btn wide">Đăng nhập bằng email</button>
+        </form>
+      </div>
+      <p id="gate-status" class="status" role="status"></p>
+      <a href="./" class="link">← Về trang chính</a>
+    </div>
+  </div>
+
+  <div id="shell" class="shell" hidden>
+    <aside class="side">
+      <a href="./" class="side-logo"><img src="assets/logo.png" alt="CHI.CH DAO."></a>
+      <span class="eyebrow side-tag">QUẢN TRỊ</span>
+      <nav id="tabs" aria-label="Mục quản trị"></nav>
+      <div class="side-foot"><span id="who" class="muted small"></span><button id="logout" class="link">Đăng xuất</button></div>
+    </aside>
+    <main id="view" tabindex="-1"></main>
+  </div>
+
+  <dialog id="drawer" class="drawer" aria-label="Chi tiết"><div id="drawer-body"></div></dialog>
+  <dialog id="viewer" class="viewer" aria-label="Xem ảnh/video"><div id="viewer-body"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="config.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

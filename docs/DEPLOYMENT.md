@@ -41,6 +41,8 @@ Trong Supabase Authentication → URL Configuration:
 
 ## 4. Cloudflare Worker
 
+> Hướng dẫn rút gọn và bảng biến đầy đủ: `cloudflare/HUONG-DAN.md`. Worker chạy được khi chưa có kho ảnh; R2 (binding `MEDIA_BUCKET`) hoặc B2 cấu hình sau.
+
 Cài Wrangler theo tài liệu Cloudflare hiện hành, kiểm tra `wrangler --help` và đăng nhập tài khoản đúng. Không ghi API token vào git.
 
 Từ root dự án:
@@ -48,7 +50,7 @@ Từ root dự án:
 ```sh
 npm ci
 npm run build
-wrangler deploy --config worker/wrangler.toml
+npx wrangler deploy --config cloudflare/wrangler.toml
 ```
 
 Điền các biến qua Cloudflare Dashboard → Worker → Settings → Variables and Secrets:
@@ -90,23 +92,19 @@ Không đặt dấu `/` ở cuối `apiUrl`. Bundle không cần build lại khi
 
 Nếu dùng custom hosting, nên thêm CSP theo đúng origin Supabase/Worker, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `Permissions-Policy: geolocation=(self), camera=(), microphone=()`. Không thêm CSP cho phép rộng chỉ để bỏ lỗi; kiểm tra thực tế trước khi bật enforce.
 
-## 6. Cấp quyền quản trị
+## 6. Quyền quản trị
 
-Đăng nhập lần đầu bằng Google trên website, rồi tìm UUID chính xác trong Supabase Auth → Users. Thay UUID sau bằng tài khoản của chủ dự án và chạy trong SQL Editor:
+Quyền admin gắn với **một email duy nhất**: `vinnielx@gmail.com` (bảng `chich_private.settings`). Không cần chạy SQL cấp quyền: đăng nhập bằng email này (Google hoặc email + mật khẩu) là có quyền.
 
-```sql
-update chich_private.accounts
-set is_admin = true
-where user_id = 'UUID_CUA_QUAN_TRI_VIEN';
-```
-
-Không dùng email chưa kiểm chứng hoặc `user_metadata` để tự cấp quyền. Đăng nhập lại/mở lại trang: menu **Quản trị** xuất hiện. Chọn ảnh hero, mô tả và lưu. Quản trị viên có thể đóng báo cáo hoặc tạm khóa tài khoản bị báo cáo.
-
-Muốn khôi phục tài khoản, dùng SQL Editor với đúng UUID:
-
-```sql
-update chich_private.accounts set suspended = false where user_id = 'UUID_CAN_KHOI_PHUC';
-```
+- Trang quản trị: `https://<domain>/admin.html` (thêm URL này vào Redirect URLs của Supabase).
+- Đổi email admin sau này (chạy trong SQL Editor):
+  ```sql
+  update chich_private.settings set admin_email = lower('email-moi@gmail.com');
+  ```
+- Admin có thể: xem thống kê, toàn bộ người dùng, hồ sơ, ảnh/video, nội dung chat, nhật ký đăng nhập/đăng xuất/hoạt động; tạo tài khoản, đổi email, đặt mật khẩu, khóa/mở khóa, xóa media, xử lý báo cáo, thay ảnh hero.
+- Mọi lần admin xem hồ sơ, đọc hội thoại và thay đổi tài khoản được ghi vào `chich_private.admin_audit` (tab Nhật ký admin).
+- Vị trí trong nhật ký là quốc gia/vùng/thành phố ước tính theo địa chỉ mạng (Cloudflare), không phải GPS. Tọa độ GPS (làm tròn, hết hạn 24 giờ) chỉ dùng cho tính khoảng cách và không hiển thị trong trang admin.
+- Đặt mật khẩu cho người dùng chỉ có tác dụng khi bật nhà cung cấp **Email** trong Supabase Authentication → Providers.
 
 ## 7. Nghiệm thu trước khi mở cộng đồng
 

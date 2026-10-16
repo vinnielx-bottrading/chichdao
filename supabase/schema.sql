@@ -1,4 +1,4 @@
--- CHI.CH DAO. v0.3. Run once on a dedicated Supabase project.
+-- CHI.CH DAO. v0.4. Run once on a dedicated Supabase project.
 -- Browser roles intentionally have NO table/RPC access. The Worker validates
 -- Supabase access tokens with /auth/v1/user, then calls this service-only API.
 begin;
@@ -23,8 +23,34 @@ create table public.cd_profiles (
 );
 create table chich_private.accounts (
  user_id uuid primary key references public.cd_profiles(id) on delete cascade,
- is_admin boolean not null default false, suspended boolean not null default false
+ is_admin boolean not null default false, suspended boolean not null default false,
+ last_seen_at timestamptz, last_country text not null default '', last_city text not null default '', last_device text not null default ''
 );
+-- Single admin, identified by the verified Supabase Auth email (Google or email login).
+create table chich_private.settings (
+ id boolean primary key default true check(id),
+ admin_email text not null check(admin_email=lower(admin_email))
+);
+insert into chich_private.settings(id,admin_email) values(true,'vinnielx@gmail.com');
+-- Account activity: sign-in/out, app opens and actions. Geo is Cloudflare's IP-level
+-- country/region/city estimate; GPS coordinates are never written here.
+create table chich_private.activity (
+ id bigint generated always as identity primary key,
+ user_id uuid not null references public.cd_profiles(id) on delete cascade,
+ event text not null check(length(event)<=40),
+ target_id uuid,
+ country text not null default '', region text not null default '', city text not null default '', device text not null default '',
+ created_at timestamptz not null default now()
+);
+create index cd_activity_user on chich_private.activity(user_id,created_at desc);
+create index cd_activity_time on chich_private.activity(created_at desc);
+-- Every admin read of private data and every admin change is recorded here.
+create table chich_private.admin_audit (
+ id bigint generated always as identity primary key,
+ admin_id uuid not null, action text not null, target_id uuid, detail jsonb not null default '{}',
+ created_at timestamptz not null default now()
+);
+create index cd_audit_time on chich_private.admin_audit(created_at desc);
 create table public.cd_media (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null references public.cd_profiles(id) on delete cascade,
@@ -98,6 +124,9 @@ alter table public.cd_reports enable row level security;
 alter table chich_private.accounts enable row level security;
 alter table chich_private.locations enable row level security;
 alter table chich_private.rate_limits enable row level security;
+alter table chich_private.settings enable row level security;
+alter table chich_private.activity enable row level security;
+alter table chich_private.admin_audit enable row level security;
 revoke all on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports from public,anon,authenticated;
 grant select,insert,update,delete on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports to service_role;
 grant select,insert,update,delete on all tables in schema chich_private to service_role;
@@ -111,6 +140,15 @@ $$;
 create function chich_private.user_exists(uid uuid) returns boolean
 language sql stable security definer set search_path='' as $$
  select exists(select 1 from auth.users where id=uid)
+$$;
+create function chich_private.auth_email(uid uuid) returns text
+language sql stable security definer set search_path='' as $$
+ select lower(email) from auth.users where id=uid
+$$;
+-- Admin directory of Auth users. Only service_role may execute (see grants below).
+create function chich_private.auth_directory() returns table(id uuid,email text,provider text,created_at timestamptz,last_sign_in_at timestamptz,confirmed boolean)
+language sql stable security definer set search_path='' as $$
+ select u.id,lower(u.email),coalesce(u.raw_app_meta_data->>'provider',''),u.created_at,u.last_sign_in_at,(u.email_confirmed_at is not null) from auth.users u
 $$;
 create function chich_private.search_key(t text) returns text
 language sql immutable security invoker set search_path='' as $$
@@ -146,6 +184,25 @@ begin
  if n>max_hits then raise exception 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.'; end if;
 end $$;
 
+create function chich_private.daily(kind text) returns jsonb
+language sql stable security invoker set search_path='' as $$
+ select jsonb_agg(jsonb_build_object('label',to_char(d,'DD/MM'),'value',case kind
+  when 'signup' then (select count(*) from public.cd_profiles where (created_at at time zone 'Asia/Ho_Chi_Minh')::date=d)
+  when 'active' then (select count(distinct user_id) from chich_private.activity where (created_at at time zone 'Asia/Ho_Chi_Minh')::date=d)
+  when 'message' then (select count(*) from public.cd_messages where (created_at at time zone 'Asia/Ho_Chi_Minh')::date=d)
+  else (select count(*) from public.cd_media where purpose='profile' and (created_at at time zone 'Asia/Ho_Chi_Minh')::date=d) end) order by d)
+ from (select generate_series((now() at time zone 'Asia/Ho_Chi_Minh')::date-29,(now() at time zone 'Asia/Ho_Chi_Minh')::date,interval '1 day')::date d) s
+$$;
+create function chich_private.dist(col text) returns jsonb
+language sql stable security invoker set search_path='' as $$
+ select coalesce(jsonb_agg(jsonb_build_object('label',x.k,'value',x.n) order by x.n desc),'[]') from (
+  select coalesce(nullif(case col when 'city' then q.city when 'intent' then q.intent when 'occupation' then q.occupation when 'body_type' then q.body_type
+   when 'lifestyle' then q.lifestyle when 'training' then q.training
+   when 'age' then case when q.age is null then '' when q.age<25 then '18–24' when q.age<30 then '25–29' when q.age<35 then '30–34' when q.age<40 then '35–39' when q.age<50 then '40–49' else '50+' end
+   when 'geo_country' then a.last_country when 'geo_city' then a.last_city when 'device' then a.last_device end,''),'Chưa có') k,count(*) n
+  from public.cd_profiles q left join chich_private.accounts a on a.user_id=q.id group by 1 order by 2 desc limit 25) x
+$$;
+
 -- Sole service API. p_actor MUST come from verified Auth user, never request JSON.
 create function public.cd_api(p_actor uuid, p_action text, p_data jsonb default '{}') returns jsonb
 language plpgsql security invoker set search_path='' as $$
@@ -163,6 +220,7 @@ begin
  if p_action='cleanup_expired' then
   delete from chich_private.locations where updated_at<now()-interval '24 hours';
   delete from chich_private.rate_limits where window_start<now()-interval '2 days';
+  delete from chich_private.activity where created_at<now()-interval '365 days';
   return '{}';
  end if;
  if p_action='cleanup_done' then
@@ -179,11 +237,25 @@ begin
  if p_actor is null or not chich_private.user_exists(p_actor) then raise exception 'Unauthenticated'; end if;
  insert into public.cd_profiles(id) values(p_actor) on conflict do nothing;
  insert into chich_private.accounts(user_id) values(p_actor) on conflict do nothing;
- select is_admin into admin from chich_private.accounts where user_id=p_actor and not suspended;
- if admin is null then raise exception 'Tài khoản hiện không khả dụng.'; end if;
+ admin:=coalesce(chich_private.auth_email(p_actor)=(select admin_email from chich_private.settings where id),false);
+ if not admin and exists(select 1 from chich_private.accounts where user_id=p_actor and suspended) then raise exception 'Tài khoản hiện không khả dụng.'; end if;
  select * into p from public.cd_profiles where id=p_actor;
+ -- Last seen + IP-level geo injected by the Worker (client-supplied _geo is stripped there).
+ if p_data ? '_geo' then
+  update chich_private.accounts set last_seen_at=now(),is_admin=admin,
+   last_country=left(coalesce(p_data->'_geo'->>'country',''),8),last_city=left(coalesce(p_data->'_geo'->>'city',''),80),last_device=left(coalesce(p_data->'_geo'->>'device',''),120)
+  where user_id=p_actor and (last_seen_at is null or last_seen_at<now()-interval '2 minutes' or p_action in ('session','logout'));
+ end if;
+ if p_action in ('session','logout','profile_save','visibility','location','location_off','like','block','unblock','report','send','finish_media','delete_media','accept_adult') then
+  if p_action in ('session','logout') then perform chich_private.throttle(p_actor,'session',30,60); end if;
+  insert into chich_private.activity(user_id,event,target_id,country,region,city,device)
+  values(p_actor,case when p_action='session' then left(coalesce(nullif(p_data->>'event',''),'session'),40) when p_action='like' and not coalesce((p_data->>'liked')::boolean,false) then 'unlike' else p_action end,
+   case when p_action in ('like','block','unblock','report','send') and coalesce(p_data->>'id','') ~* '^[0-9a-f-]{36}$' then (p_data->>'id')::uuid end,
+   left(coalesce(p_data->'_geo'->>'country',''),8),left(coalesce(p_data->'_geo'->>'region',''),80),left(coalesce(p_data->'_geo'->>'city',''),80),left(coalesce(p_data->'_geo'->>'device',''),120));
+  if p_action='logout' then return '{}'; end if;
+ end if;
 
- if p_action='me' then
+ if p_action in ('me','session') then
   return chich_private.profile_json(p)||jsonb_build_object('admin',admin,'nearbyEnabled',exists(select 1 from chich_private.locations where user_id=p_actor and updated_at>now()-interval '24 hours'),
   'likes',coalesce((select jsonb_agg(target_id) from public.cd_likes where user_id=p_actor),'[]'));
  elsif p_action='accept_adult' then
@@ -272,14 +344,134 @@ begin
   return '{}';
  elsif p_action='media_file' then
   select * into m from public.cd_media where id=(p_data->>'id')::uuid and status='ready';
-  if m.id is null or (m.purpose='hero' and not admin) or not chich_private.can_view(p_actor,m.user_id) then raise exception 'Không tìm thấy ảnh/video.'; end if; return to_jsonb(m);
- elsif p_action='admin_hero' then
+  if m.id is null or (not admin and (m.purpose='hero' or not chich_private.can_view(p_actor,m.user_id))) then raise exception 'Không tìm thấy ảnh/video.'; end if; return to_jsonb(m);
+
+ -- ===================== Admin console (single admin by email) =====================
+ elsif p_action like 'admin\_%' then
   if not admin then raise exception 'Forbidden'; end if;
+  if p_action='admin_stats' then
+   return jsonb_build_object(
+    'totals',jsonb_build_object(
+     'users',(select count(*) from chich_private.auth_directory()),
+     'profiles',(select count(*) from public.cd_profiles),
+     'complete',(select count(*) from public.cd_profiles q where chich_private.complete(q)),
+     'visible',(select count(*) from public.cd_profiles where visible),
+     'suspended',(select count(*) from chich_private.accounts where suspended),
+     'active24h',(select count(*) from chich_private.accounts where last_seen_at>now()-interval '24 hours'),
+     'active7d',(select count(*) from chich_private.accounts where last_seen_at>now()-interval '7 days'),
+     'messages',(select count(*) from public.cd_messages),
+     'messages24h',(select count(*) from public.cd_messages where created_at>now()-interval '24 hours'),
+     'conversations',(select count(distinct (least(sender_id,recipient_id),greatest(sender_id,recipient_id))) from public.cd_messages),
+     'images',(select count(*) from public.cd_media where kind='image' and purpose='profile' and status='ready'),
+     'videos',(select count(*) from public.cd_media where kind='video' and purpose='profile' and status='ready'),
+     'likes',(select count(*) from public.cd_likes),
+     'blocks',(select count(*) from public.cd_blocks),
+     'openReports',(select count(*) from public.cd_reports where not resolved),
+     'nearby',(select count(*) from chich_private.locations where updated_at>now()-interval '24 hours')),
+    'signups',chich_private.daily('signup'),
+    'active',chich_private.daily('active'),
+    'messagesDaily',chich_private.daily('message'),
+    'uploadsDaily',chich_private.daily('upload'),
+    'hours',(select jsonb_agg(jsonb_build_object('label',h||'h','value',(select count(*) from chich_private.activity a where a.created_at>now()-interval '30 days' and extract(hour from a.created_at at time zone 'Asia/Ho_Chi_Minh')=h)) order by h) from generate_series(0,23) h),
+    'city',chich_private.dist('city'),'intent',chich_private.dist('intent'),'occupation',chich_private.dist('occupation'),
+    'bodyType',chich_private.dist('body_type'),'lifestyle',chich_private.dist('lifestyle'),'training',chich_private.dist('training'),'age',chich_private.dist('age'),
+    'geoCountry',chich_private.dist('geo_country'),'geoCity',chich_private.dist('geo_city'),'device',chich_private.dist('device'),
+    'events',(select coalesce(jsonb_agg(jsonb_build_object('label',x.event,'value',x.n) order by x.n desc),'[]') from (select event,count(*) n from chich_private.activity where created_at>now()-interval '30 days' group by 1) x));
+  elsif p_action='admin_users' then
+   k=chich_private.search_key(left(coalesce(p_data->>'query',''),100));
+   return coalesce((select jsonb_agg(x.row order by x.created_at desc) from (
+    select u.created_at,jsonb_build_object('id',u.id,'email',u.email,'provider',u.provider,'createdAt',u.created_at,'lastSignIn',u.last_sign_in_at,
+     'name',coalesce(q.name,''),'age',q.age,'city',coalesce(q.city,''),'intent',coalesce(q.intent,''),'complete',coalesce(chich_private.complete(q),false),'visible',coalesce(q.visible,false),
+     'suspended',coalesce(a.suspended,false),'lastSeen',a.last_seen_at,'lastCity',coalesce(a.last_city,''),'lastCountry',coalesce(a.last_country,''),
+     'images',(select count(*) from public.cd_media md where md.user_id=u.id and md.kind='image' and md.purpose='profile' and md.status='ready'),
+     'videos',(select count(*) from public.cd_media md where md.user_id=u.id and md.kind='video' and md.purpose='profile' and md.status='ready'),
+     'sent',(select count(*) from public.cd_messages mm where mm.sender_id=u.id),
+     'reported',(select count(*) from public.cd_reports r where r.target_id=u.id)) as row
+    from chich_private.auth_directory() u left join public.cd_profiles q on q.id=u.id left join chich_private.accounts a on a.user_id=u.id
+    where (k='' or chich_private.search_key(coalesce(u.email,'')||' '||coalesce(q.name,'')||' '||coalesce(q.city,'')||' '||coalesce(a.last_city,'')) like '%'||k||'%')
+     and (coalesce(p_data->>'filter','all')='all' or (p_data->>'filter'='suspended' and coalesce(a.suspended,false)) or (p_data->>'filter'='incomplete' and not coalesce(chich_private.complete(q),false)) or (p_data->>'filter'='complete' and coalesce(chich_private.complete(q),false)))
+    order by u.created_at desc limit 50 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
+  elsif p_action='admin_user' then
+   target=(p_data->>'id')::uuid;
+   insert into chich_private.admin_audit(admin_id,action,target_id) values(p_actor,'view_user',target);
+   return jsonb_build_object(
+    'auth',(select to_jsonb(u) from chich_private.auth_directory() u where u.id=target),
+    'account',(select to_jsonb(a)-'user_id' from chich_private.accounts a where a.user_id=target),
+    'profile',(select chich_private.profile_json(q)||jsonb_build_object('adultAcceptedAt',q.adult_accepted_at,'createdAt',q.created_at,'updatedAt',q.updated_at) from public.cd_profiles q where q.id=target),
+    'media',coalesce((select jsonb_agg(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes,'caption',md.caption,'status',md.status,'purpose',md.purpose,'createdAt',md.created_at) order by md.created_at desc) from public.cd_media md where md.user_id=target),'[]'),
+    'nearby',(select jsonb_build_object('enabled',true,'updatedAt',l.updated_at) from chich_private.locations l where l.user_id=target and l.updated_at>now()-interval '24 hours'),
+    'activity',coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (select id,event,target_id,country,region,city,device,created_at from chich_private.activity where user_id=target order by created_at desc limit 300) x),'[]'),
+    'conversations',coalesce((select jsonb_agg(to_jsonb(x) order by x.last_at desc) from (
+      select g.partner_id,g.n,g.last_at,pq.name partner_name,chich_private.auth_email(g.partner_id) partner_email from (
+       select case when mm.sender_id=target then mm.recipient_id else mm.sender_id end as partner_id,count(*) n,max(mm.created_at) last_at
+       from public.cd_messages mm where target in (mm.sender_id,mm.recipient_id) group by 1) g left join public.cd_profiles pq on pq.id=g.partner_id) x),'[]'),
+    'likesGiven',(select count(*) from public.cd_likes where user_id=target),
+    'likesReceived',(select count(*) from public.cd_likes where target_id=target),
+    'blocksGiven',(select count(*) from public.cd_blocks where user_id=target),
+    'blockedBy',(select count(*) from public.cd_blocks where target_id=target),
+    'reportsAgainst',coalesce((select jsonb_agg(to_jsonb(r) order by r.created_at desc) from public.cd_reports r where r.target_id=target),'[]'),
+    'reportsBy',coalesce((select jsonb_agg(to_jsonb(r) order by r.created_at desc) from public.cd_reports r where r.reporter_id=target),'[]'));
+  elsif p_action='admin_conversations' then
+   target=nullif(p_data->>'userId','')::uuid;
+   return coalesce((select jsonb_agg(to_jsonb(x) order by x.last_at desc) from (
+    select c.a,c.b,c.n,c.last_at,c.preview,pa.name a_name,pb.name b_name,chich_private.auth_email(c.a) a_email,chich_private.auth_email(c.b) b_email from (
+     select least(sender_id,recipient_id) a,greatest(sender_id,recipient_id) b,count(*) n,max(created_at) last_at,left((array_agg(body order by created_at desc))[1],140) preview
+     from public.cd_messages where target is null or target in (sender_id,recipient_id) group by 1,2) c
+    join public.cd_profiles pa on pa.id=c.a join public.cd_profiles pb on pb.id=c.b
+    order by c.last_at desc limit 50 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
+  elsif p_action='admin_messages' then
+   target=(p_data->>'a')::uuid;media_id=(p_data->>'b')::uuid;
+   insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'view_chat',target,jsonb_build_object('with',media_id));
+   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select id,sender_id,recipient_id,body,created_at from public.cd_messages
+    where (sender_id=target and recipient_id=media_id) or (sender_id=media_id and recipient_id=target) order by created_at desc limit 1000) x),'[]');
+  elsif p_action='admin_media' then
+   return jsonb_build_object('media',coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (
+    select md.id,md.user_id,md.kind,md.mime,md.bytes,md.caption,md.status,md.purpose,md.created_at,q.name owner_name,chich_private.auth_email(md.user_id) owner_email
+    from public.cd_media md join public.cd_profiles q on q.id=md.user_id
+    where md.status='ready' and (coalesce(p_data->>'kind','all')='all' or md.kind=p_data->>'kind')
+    order by md.created_at desc limit 60 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]'));
+  elsif p_action='admin_activity' then
+   target=nullif(p_data->>'userId','')::uuid;
+   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (
+    select a.id,a.user_id,a.event,a.target_id,a.country,a.region,a.city,a.device,a.created_at,q.name,chich_private.auth_email(a.user_id) email
+    from chich_private.activity a join public.cd_profiles q on q.id=a.user_id
+    where (target is null or a.user_id=target) and (coalesce(p_data->>'event','all')='all' or a.event=p_data->>'event')
+    order by a.created_at desc limit 100 offset least(10000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
+  elsif p_action='admin_suspend' then
+   target=(p_data->>'id')::uuid;
+   if target=p_actor then raise exception 'Không thể khóa tài khoản quản trị.'; end if;
+   insert into public.cd_profiles(id) select target where chich_private.user_exists(target) on conflict do nothing;
+   insert into chich_private.accounts(user_id) select target where exists(select 1 from public.cd_profiles where id=target) on conflict do nothing;
+   update chich_private.accounts set suspended=coalesce((p_data->>'suspended')::boolean,true) where user_id=target;
+   insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'suspend',target,jsonb_build_object('suspended',coalesce((p_data->>'suspended')::boolean,true)));
+   return '{}';
+  elsif p_action='admin_delete_media' then
+   update public.cd_media set status='deleting' where id=(p_data->>'id')::uuid returning * into m;
+   if m.id is null then raise exception 'Không tìm thấy ảnh/video.'; end if;
+   update public.cd_settings set hero_media_id=null where hero_media_id=m.id;
+   insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'delete_media',m.user_id,jsonb_build_object('media',m.id));
+   return to_jsonb(m);
+  elsif p_action='admin_audit_add' then
+   insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,left(p_data->>'action',40),nullif(p_data->>'target','')::uuid,coalesce(p_data->'detail','{}'));
+   return '{}';
+  elsif p_action='admin_audit' then
+   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (
+    select au.*,q.name target_name,chich_private.auth_email(au.target_id) target_email from chich_private.admin_audit au left join public.cd_profiles q on q.id=au.target_id
+    order by au.created_at desc limit 200 offset least(10000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
+  elsif p_action='admin_hero' then
   select * into m from public.cd_media where id=(p_data->>'id')::uuid and purpose='hero' and kind='image' and status='ready';
   if m.id is null then raise exception 'Ảnh hero chưa sẵn sàng.'; end if;
   update public.cd_settings set hero_media_id=m.id,hero_alt=left(coalesce(nullif(trim(p_data->>'alt'),''),'Sức hút từ những điều đời thường'),160) where id;
   update public.cd_media set status='deleting' where purpose='hero' and id<>m.id;
   return '{}';
+  elsif p_action='admin_reports' then
+   return coalesce((select jsonb_agg(to_jsonb(a) order by a.created_at) from (select r.*,rp.name reporter_name,tp.name target_name,chich_private.auth_email(r.reporter_id) reporter_email,chich_private.auth_email(r.target_id) target_email from public.cd_reports r join public.cd_profiles rp on rp.id=r.reporter_id join public.cd_profiles tp on tp.id=r.target_id where not r.resolved order by r.created_at limit 100) a),'[]');
+  elsif p_action='admin_resolve' then
+   update public.cd_reports set resolved=true where id=(p_data->>'id')::uuid returning target_id into target;
+   if coalesce((p_data->>'suspend')::boolean,false) and target is not null and target<>p_actor then update chich_private.accounts set suspended=true where user_id=target;end if;
+   insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'resolve_report',target,jsonb_build_object('suspend',coalesce((p_data->>'suspend')::boolean,false)));return '{}';
+  else raise exception 'Unknown action';
+  end if;
  elsif p_action in ('like','block','unblock','report','send') then
   target=(p_data->>'id')::uuid;
   if target=p_actor then raise exception 'Không thể thao tác với chính mình.'; end if;
@@ -309,18 +501,11 @@ begin
   target=(p_data->>'id')::uuid;
   if not chich_private.can_view(p_actor,target) then raise exception 'Cuộc trò chuyện không khả dụng.';end if;
   return coalesce((select jsonb_agg(to_jsonb(a) order by a.created_at) from (select id,sender_id,body,created_at from public.cd_messages where (sender_id=p_actor and recipient_id=target) or (sender_id=target and recipient_id=p_actor) order by created_at desc limit 100) a),'[]');
- elsif p_action='admin_reports' then
-  if not admin then raise exception 'Forbidden';end if;
-  return coalesce((select jsonb_agg(to_jsonb(a)) from (select * from public.cd_reports where not resolved order by created_at limit 100) a),'[]');
- elsif p_action='admin_resolve' then
-  if not admin then raise exception 'Forbidden';end if;
-  update public.cd_reports set resolved=true where id=(p_data->>'id')::uuid returning target_id into target;
-  if coalesce((p_data->>'suspend')::boolean,false) and target is not null and target<>p_actor then update chich_private.accounts set suspended=true where user_id=target and not is_admin;end if;return '{}';
  end if;
  raise exception 'Unknown action';
 end $$;
 revoke all on all functions in schema chich_private from public,anon,authenticated;
-revoke all on function chich_private.user_exists(uuid) from public,anon,authenticated;
+revoke all on function chich_private.user_exists(uuid),chich_private.auth_email(uuid),chich_private.auth_directory() from public,anon,authenticated;
 grant execute on all functions in schema chich_private to service_role;
 revoke all on function public.cd_api(uuid,text,jsonb) from public,anon,authenticated;
 grant execute on function public.cd_api(uuid,text,jsonb) to service_role;

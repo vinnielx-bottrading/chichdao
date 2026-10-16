@@ -1,0 +1,26 @@
+# Cloudflare Worker config for CHI.CH DAO. API.
+# Deploy:  npx wrangler deploy --config cloudflare/wrangler.toml
+name = "chich-dao-api"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[triggers]
+crons = ["*/30 * * * *"]
+
+[vars]
+SUPABASE_URL = "https://oignkueulvvdfhgcvguv.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_fPydS416joWqg53YBGFFsQ_CtbiMCEh"
+ALLOWED_ORIGINS = "https://YOUR-SITE.vercel.app"
+
+# Secrets — set with `npx wrangler secret put NAME` or in the dashboard, never here:
+#   SUPABASE_SERVICE_ROLE_KEY, MEDIA_SIGNING_SECRET
+#
+# Media storage (later). Option A — Cloudflare R2: uncomment after creating the bucket.
+# [[r2_buckets]]
+# binding = "MEDIA_BUCKET"
+# bucket_name = "chich-dao-media"
+#
+# Option B — Backblaze B2: set vars B2_ENDPOINT, B2_REGION, B2_BUCKET and secrets B2_KEY_ID, B2_APPLICATION_KEY.
+
+# Do not enable request logging: media URLs carry signed tokens.

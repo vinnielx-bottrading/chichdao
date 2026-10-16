@@ -1,11 +1,17 @@
 import { AwsClient } from 'aws4fetch';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const actions=new Set(['me','accept_adult','profile_save','visibility','location','location_off','discover','profile','edit_media','like','block','unblock','report','send','liked','blocked','contacts','messages','admin_hero','admin_reports','admin_resolve']);
+const EMAIL=/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+const userActions=['me','session','logout','accept_adult','profile_save','visibility','location','location_off','discover','profile','edit_media','like','block','unblock','report','send','liked','blocked','contacts','messages'];
+const adminActions=['admin_stats','admin_users','admin_user','admin_conversations','admin_messages','admin_media','admin_activity','admin_suspend','admin_audit','admin_hero','admin_reports','admin_resolve'];
+// admin_delete_media is handled specially (storage delete); admin_audit_add is Worker-only and never client-callable.
+const actions=new Set([...userActions,...adminActions]);
 const enc=new TextEncoder();
 class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
 export function allowedOrigin(origin,env){return (env.ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).includes(origin);}
-export function validConfig(env){return ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_SERVICE_ROLE_KEY','B2_ENDPOINT','B2_BUCKET','B2_REGION','B2_KEY_ID','B2_APPLICATION_KEY','MEDIA_SIGNING_SECRET','ALLOWED_ORIGINS'].every(k=>env[k]);}
+// Core API runs without media storage; uploads stay disabled until R2 or B2 is configured.
+export function validConfig(env){return ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_SERVICE_ROLE_KEY','MEDIA_SIGNING_SECRET','ALLOWED_ORIGINS'].every(k=>env[k]);}
+export function storageMode(env){if(env.MEDIA_BUCKET&&typeof env.MEDIA_BUCKET.put==='function')return 'r2';if(['B2_ENDPOINT','B2_BUCKET','B2_REGION','B2_KEY_ID','B2_APPLICATION_KEY'].every(k=>env[k]))return 'b2';return '';}
 export async function boundedBody(request,max){
  const declared=Number(request.headers.get('content-length'));
  if(declared>max)throw new HttpError(413,'File vượt giới hạn dung lượng.');
@@ -24,10 +30,19 @@ export function sniffMime(b){
  if(b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3&&new TextDecoder().decode(b.slice(0,128)).includes('webm'))return 'video/webm';
  return '';
 }
+export function deviceLabel(ua=''){
+ const os=/iPhone|iPad/.test(ua)?'iOS':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac OS X/.test(ua)?'macOS':/Linux/.test(ua)?'Linux':'Khác';
+ const br=/Edg\//.test(ua)?'Edge':/OPR\/|Opera/.test(ua)?'Opera':/CocCoc|coc_coc/i.test(ua)?'Cốc Cốc':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'Khác';
+ return `${os} · ${br}`;
+}
+// IP-level location estimate from Cloudflare (country/region/city). Never GPS.
+function geo(req){const cf=req.cf||{};return {country:String(cf.country||'').slice(0,8),region:String(cf.region||'').slice(0,80),city:String(cf.city||'').slice(0,80),device:deviceLabel(req.headers.get('user-agent')||'')};}
 async function jsonBody(req){try{return JSON.parse(new TextDecoder().decode(await boundedBody(req,16384)));}catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,'Dữ liệu không hợp lệ.');}}
 function json(body,status=200){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});}
+// Accepts either the legacy service_role JWT or a new sb_secret_ key (secret keys go in `apikey` only).
+function serviceHeaders(env){const k=env.SUPABASE_SERVICE_ROLE_KEY;return k.startsWith('sb_secret_')?{apikey:k,'content-type':'application/json'}:{apikey:k,Authorization:`Bearer ${k}`,'content-type':'application/json'};}
 async function rpc(env,actor,action,data={}){
- const response=await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/cd_api`,{method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'content-type':'application/json'},body:JSON.stringify({p_actor:actor,p_action:action,p_data:data})});
+ const response=await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/cd_api`,{method:'POST',headers:serviceHeaders(env),body:JSON.stringify({p_actor:actor,p_action:action,p_data:data})});
  const body=await response.json();
  if(!response.ok){const safe=body.code==='P0001'?body.message:'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin và thử lại.';throw new HttpError(body.message==='Forbidden'?403:/quá nhanh/.test(body.message||'')?429:400,safe);}
  return body;
@@ -36,7 +51,7 @@ async function actor(req,env){
  const token=req.headers.get('authorization');if(!token?.startsWith('Bearer '))throw new HttpError(401,'Vui lòng đăng nhập.');
  const r=await fetch(`${env.SUPABASE_URL}/auth/v1/user`,{headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,authorization:token}});
  if(!r.ok)throw new HttpError(401,'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
- const user=await r.json();if(!UUID.test(user.id)||user.is_anonymous)throw new HttpError(401,'Vui lòng đăng nhập bằng Google.');return user.id;
+ const user=await r.json();if(!UUID.test(user.id)||user.is_anonymous)throw new HttpError(401,'Vui lòng đăng nhập.');return user;
 }
 async function hmac(secret,message){const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);return {key,bytes:enc.encode(message)};}
 export async function signMedia(secret,id,viewer,expires){const {key,bytes}=await hmac(secret,`${id}:${viewer}:${expires}`);return Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');}
@@ -44,32 +59,79 @@ export async function verifyMedia(secret,id,viewer,expires,sig){
  if(!UUID.test(id)||!UUID.test(viewer)||!/^\d+$/.test(String(expires))||Number(expires)<Date.now()/1000||Number(expires)>Date.now()/1000+610||!/^[0-9a-f]{64}$/.test(sig||''))return false;
  const {key,bytes}=await hmac(secret,`${id}:${viewer}:${expires}`);return crypto.subtle.verify('HMAC',key,Uint8Array.from(sig.match(/../g),h=>parseInt(h,16)),bytes);
 }
-async function hydrate(data,viewer,origin,env){
+// Adds a short-lived signed `src` to every media item under `photos` or `media` keys, at any depth.
+export async function hydrate(data,viewer,origin,env){
  if(Array.isArray(data))return Promise.all(data.map(x=>hydrate(x,viewer,origin,env)));
  if(!data||typeof data!=='object')return data;
- if(data.photos){const expires=Math.floor(Date.now()/1000)+600;data.photos=await Promise.all(data.photos.map(async m=>({...m,src:`${origin}/media/${m.id}?viewer=${viewer}&expires=${expires}&sig=${await signMedia(env.MEDIA_SIGNING_SECRET,m.id,viewer,expires)}`})));}
- return data;
+ const expires=Math.floor(Date.now()/1000)+600,out={};
+ for(const [k,v] of Object.entries(data)){
+  if((k==='photos'||k==='media')&&Array.isArray(v))out[k]=await Promise.all(v.map(async m=>m&&UUID.test(m.id||'')&&(!m.status||m.status==='ready')?{...m,src:`${origin}/media/${m.id}?viewer=${viewer}&expires=${expires}&sig=${await signMedia(env.MEDIA_SIGNING_SECRET,m.id,viewer,expires)}`}:m));
+  else out[k]=v&&typeof v==='object'?await hydrate(v,viewer,origin,env):v;
+ }
+ return out;
 }
+// ---------- Storage: Cloudflare R2 binding (MEDIA_BUCKET) or Backblaze B2 (S3 API) ----------
 function b2URL(env,key){const base=new URL(env.B2_ENDPOINT);if(base.protocol!=='https:'||!base.hostname.endsWith('.backblazeb2.com'))throw new HttpError(503,'Kho ảnh chưa sẵn sàng.');return `${base.origin}/${encodeURIComponent(env.B2_BUCKET)}/${key.split('/').map(encodeURIComponent).join('/')}`;}
 async function b2(env,key,method,body,headers={}){
  const client=new AwsClient({accessKeyId:env.B2_KEY_ID,secretAccessKey:env.B2_APPLICATION_KEY,region:env.B2_REGION,service:'s3'});
  return client.fetch(b2URL(env,key),{method,headers,body});
 }
-async function deleteObject(env,m){const r=await b2(env,m.object_key,'DELETE');if(!r.ok&&r.status!==404)throw new HttpError(502,'Đang chờ xóa file khỏi kho ảnh. Hệ thống sẽ thử lại.');await rpc(env,null,'cleanup_done',{id:m.id});}
+function requireStorage(env){const mode=storageMode(env);if(!mode)throw new HttpError(503,'Kho ảnh/video chưa được cấu hình. Vui lòng thử lại sau.');return mode;}
+async function putObject(env,key,bytes,mime){
+ if(requireStorage(env)==='r2'){await env.MEDIA_BUCKET.put(key,bytes,{httpMetadata:{contentType:mime}});return;}
+ const r=await b2(env,key,'PUT',bytes,{'content-type':mime,'x-amz-server-side-encryption':'AES256'});if(!r.ok)throw new HttpError(502,'Chưa tải được file. Vui lòng thử lại.');
+}
+async function deleteObject(env,m){
+ const mode=storageMode(env);
+ if(mode==='r2')await env.MEDIA_BUCKET.delete(m.object_key);
+ else if(mode==='b2'){const r=await b2(env,m.object_key,'DELETE');if(!r.ok&&r.status!==404)throw new HttpError(502,'Đang chờ xóa file khỏi kho ảnh. Hệ thống sẽ thử lại.');}
+ else return; // no storage yet: the row stays 'deleting' and cron retries later
+ await rpc(env,null,'cleanup_done',{id:m.id});
+}
 async function readFile(req,env,media){
  const range=req.headers.get('range');if(range&&!/^bytes=\d*-\d*$/.test(range))throw new HttpError(416,'Range không hợp lệ.');
+ const headers=new Headers({'content-type':media.mime,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline','accept-ranges':'bytes'});
+ if(requireStorage(env)==='r2'){
+  const obj=await env.MEDIA_BUCKET.get(media.object_key,range?{range:req.headers}:undefined);
+  if(!obj)throw new HttpError(404,'Không tìm thấy ảnh/video.');
+  if(range&&obj.range){const off=obj.range.offset??0,len=obj.range.length??(obj.size-off);headers.set('content-range',`bytes ${off}-${off+len-1}/${obj.size}`);headers.set('content-length',String(len));return new Response(obj.body,{status:206,headers});}
+  headers.set('content-length',String(obj.size));return new Response(obj.body,{status:200,headers});
+ }
  const upstream=await b2(env,media.object_key,'GET',undefined,range?{range}:{});
  if(!upstream.ok)throw new HttpError(upstream.status===416?416:404,'Không tìm thấy ảnh/video.');
- const headers=new Headers({'content-type':media.mime,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline','accept-ranges':'bytes'});
  for(const key of ['content-length','content-range'])if(upstream.headers.has(key))headers.set(key,upstream.headers.get(key));
  return new Response(upstream.body,{status:upstream.status,headers});
 }
+// ---------- Admin: Supabase Auth Admin API (create user, change email/password) ----------
+async function authAdmin(req,env,user){
+ const me=await rpc(env,user.id,'me',{});if(!me.admin)throw new HttpError(403,'Chỉ quản trị viên được thực hiện.');
+ const body=await jsonBody(req),op=body.op;
+ const email=typeof body.email==='string'?body.email.trim().toLowerCase():'',password=typeof body.password==='string'?body.password:'';
+ if(email&&!EMAIL.test(email))throw new HttpError(400,'Email không hợp lệ.');
+ if(password&&(password.length<8||password.length>72))throw new HttpError(400,'Mật khẩu cần 8–72 ký tự.');
+ let url,method,payload;
+ if(op==='create'){
+  if(!email||!password)throw new HttpError(400,'Nhập email và mật khẩu.');
+  url=`${env.SUPABASE_URL}/auth/v1/admin/users`;method='POST';payload={email,password,email_confirm:true};
+ }else if(op==='update'){
+  if(!UUID.test(body.id||''))throw new HttpError(400,'Người dùng không hợp lệ.');
+  if(!email&&!password)throw new HttpError(400,'Nhập email mới hoặc mật khẩu mới.');
+  if(email&&body.id===user.id)throw new HttpError(400,'Không đổi email của tài khoản quản trị tại đây; quyền admin gắn với email này.');
+  url=`${env.SUPABASE_URL}/auth/v1/admin/users/${body.id}`;method='PUT';payload={...(email?{email,email_confirm:true}:{}),...(password?{password}:{})};
+ }else throw new HttpError(400,'Thao tác không hợp lệ.');
+ const r=await fetch(url,{method,headers:serviceHeaders(env),body:JSON.stringify(payload)});
+ const result=await r.json().catch(()=>({}));
+ if(!r.ok){const msg=String(result.msg||result.message||result.error_description||'');throw new HttpError(400,/already|exists|registered/i.test(msg)?'Email này đã được sử dụng.':/password/i.test(msg)?'Mật khẩu chưa đạt yêu cầu bảo mật của Supabase.':'Không cập nhật được tài khoản.');}
+ const target=result.id||body.id;
+ await rpc(env,user.id,'admin_audit_add',{action:op==='create'?'create_user':'update_auth',target,detail:{email:email||null,passwordChanged:!!password}});
+ return json({id:target,email:result.email||email});
+}
 async function handle(req,env){
  const url=new URL(req.url),path=url.pathname;
- if(req.method==='GET'&&path==='/health')return json({ready:!!validConfig(env)});
+ if(req.method==='GET'&&path==='/health')return json({ready:validConfig(env),storage:storageMode(env)||'none'});
  if(!validConfig(env))throw new HttpError(503,'Dịch vụ đang được chuẩn bị. Vui lòng quay lại sau.');
  if(req.method==='GET'&&path==='/hero'){
-  const hero=await rpc(env,null,'hero');return json({...hero,src:hero.mediaId?`${url.origin}/hero/${hero.mediaId}`:null});
+  const hero=await rpc(env,null,'hero');return json({...hero,src:hero.mediaId&&storageMode(env)?`${url.origin}/hero/${hero.mediaId}`:null});
  }
  if(req.method==='GET'&&path.startsWith('/hero/')){const id=path.slice(6);if(!UUID.test(id))throw new HttpError(404,'Không tìm thấy ảnh.');return readFile(req,env,await rpc(env,null,'hero_file',{id}));}
  if(req.method==='GET'&&path.startsWith('/media/')){
@@ -79,26 +141,31 @@ async function handle(req,env){
  }
  const user=await actor(req,env);
  if(req.method==='POST'&&path==='/api'){
-  const {action,data={}}=await jsonBody(req);if(!actions.has(action))throw new HttpError(400,'Thao tác không hợp lệ.');
-  const result=await rpc(env,user,action,data);return json(await hydrate(result,user,url.origin,env));
+  const {action,data={}}=await jsonBody(req);
+  if(action!=='admin_delete_media'&&!actions.has(action))throw new HttpError(400,'Thao tác không hợp lệ.');
+  const payload={...(data&&typeof data==='object'&&!Array.isArray(data)?data:{})};delete payload._geo;payload._geo=geo(req);
+  if(action==='admin_delete_media'){const m=await rpc(env,user.id,'admin_delete_media',payload);await deleteObject(env,m).catch(()=>{});return json({deleted:true});}
+  const result=await rpc(env,user.id,action,payload);return json(await hydrate(result,user.id,url.origin,env));
  }
+ if(req.method==='POST'&&path==='/admin/auth')return authAdmin(req,env,user);
  if(req.method==='POST'&&path==='/uploads'){
-  const data=await jsonBody(req);const m=await rpc(env,user,'reserve_media',data);return json({id:m.id,uploadUrl:`${url.origin}/uploads/${m.id}`});
+  requireStorage(env);
+  const data=await jsonBody(req);const m=await rpc(env,user.id,'reserve_media',data);return json({id:m.id,uploadUrl:`${url.origin}/uploads/${m.id}`});
  }
  if(req.method==='PUT'&&path.startsWith('/uploads/')){
   const id=path.slice(9);if(!UUID.test(id))throw new HttpError(400,'File không hợp lệ.');
-  const m=await rpc(env,user,'claim_media',{id});
+  requireStorage(env);
+  const m=await rpc(env,user.id,'claim_media',{id});
   try{
    const bytes=await boundedBody(req,m.bytes);
    if(bytes.byteLength!==m.bytes||sniffMime(bytes)!==m.mime)throw new HttpError(415,'Nội dung file không khớp định dạng đã chọn.');
-   const stored=await b2(env,m.object_key,'PUT',bytes,{'content-type':m.mime,'x-amz-server-side-encryption':'AES256'});
-   if(!stored.ok)throw new HttpError(502,'Chưa tải được file. Vui lòng thử lại.');
-   await rpc(env,user,'finish_media',{id});return json({id});
-  }catch(error){await rpc(env,user,'delete_media',{id}).catch(()=>{});await deleteObject(env,m).catch(()=>{});throw error;}
+   await putObject(env,m.object_key,bytes,m.mime);
+   await rpc(env,user.id,'finish_media',{id,_geo:geo(req)});return json({id});
+  }catch(error){await rpc(env,user.id,'delete_media',{id}).catch(()=>{});await deleteObject(env,m).catch(()=>{});throw error;}
  }
  if(req.method==='DELETE'&&path.startsWith('/media/')){
   const id=path.slice(7);if(!UUID.test(id))throw new HttpError(400,'File không hợp lệ.');
-  const m=await rpc(env,user,'delete_media',{id});await deleteObject(env,m);return json({deleted:true});
+  const m=await rpc(env,user.id,'delete_media',{id,_geo:geo(req)});await deleteObject(env,m);return json({deleted:true});
  }
  throw new HttpError(404,'Không tìm thấy trang.');
 }
@@ -110,9 +177,9 @@ export default {
   if(req.method==='OPTIONS')response=new Response(null,{status:204});
   else try{response=await handle(req,env);}catch(e){response=json({error:e instanceof HttpError?e.message:'Dịch vụ tạm thời gián đoạn. Vui lòng thử lại.'},e.status||500);}
   const headers=new Headers(response.headers);
-  if(allowed){headers.set('access-control-allow-origin',origin);headers.set('vary','Origin');headers.set('access-control-allow-methods','GET, POST, PUT, DELETE, OPTIONS');headers.set('access-control-allow-headers','Authorization, Content-Type, Range');headers.set('access-control-expose-headers','Content-Range, Accept-Ranges');}
+  if(allowed){headers.set('access-control-allow-origin',origin);headers.set('vary','Origin');headers.set('access-control-allow-methods','GET, POST, PUT, DELETE, OPTIONS');headers.set('access-control-allow-headers','Authorization, Content-Type, Range');headers.set('access-control-expose-headers','Content-Range, Accept-Ranges');headers.set('access-control-max-age','600');}
   headers.set('x-content-type-options','nosniff');headers.set('referrer-policy','no-referrer');
   return new Response(response.body,{status:response.status,headers});
  },
- async scheduled(_event,env,ctx){ctx.waitUntil((async()=>{if(!validConfig(env))return;await rpc(env,null,'cleanup_expired');for(const m of await rpc(env,null,'cleanup_list'))await deleteObject(env,m).catch(()=>{});})());}
+ async scheduled(_event,env,ctx){ctx.waitUntil((async()=>{if(!validConfig(env))return;await rpc(env,null,'cleanup_expired');if(!storageMode(env))return;for(const m of await rpc(env,null,'cleanup_list'))await deleteObject(env,m).catch(()=>{});})());}
 };
