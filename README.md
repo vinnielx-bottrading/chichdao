@@ -1,4 +1,4 @@
-# CHI.CH DAO. — v0.7
+# CHI.CH DAO. — v0.8
 
 Ứng dụng hẹn hò nam–nam 18+, cài được như app (PWA). Frontend trên **Vercel**; API là **Cloudflare Worker**; **Supabase** làm database (và đăng nhập Google/email); **Backblaze B2** (bucket private) lưu ảnh/video. Hướng dẫn triển khai: `cloudflare/HUONG-DAN.md`.
 
@@ -74,10 +74,13 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 ## Nâng cấp database
 
 - Cài mới (chưa có dữ liệu): `supabase/schema.sql`.
-- Đang chạy bản cũ, muốn giữ dữ liệu: chạy lần lượt `supabase/upgrade-v0.6.sql` rồi `supabase/upgrade-v0.7.sql` (chạy lại nhiều lần cũng an toàn).
+- Đang chạy bản cũ, muốn giữ dữ liệu: chạy lần lượt `supabase/upgrade-v0.6.sql`, `upgrade-v0.7.sql`, `upgrade-v0.8.sql` (chạy lại nhiều lần cũng an toàn).
 - Cài lại từ đầu (xóa dữ liệu app, giữ tài khoản đăng nhập): `supabase/reset-and-install.sql`.
 
 ## Quy tắc sản phẩm
+
+- Giao diện màu: admin chọn trong Admin → Cài đặt (7 phối: 6 phối theo Brand Guidelines v1 + Navy · San hô mặc định). Màu gốc ở `dist/themes.css`, mọi màu khác tính từ đó; logo trong suốt theo từng phối ở `dist/assets/logos/`.
+- Góp ý: nút "Góp ý" ở trang đăng nhập và chân trang mở cửa sổ nhỏ, gửi xong hiện cảm ơn rồi tự đóng. Mỗi thiết bị 1 lần/24 giờ, mỗi địa chỉ mạng tối đa 5 lần/24 giờ. Đây là RPC duy nhất trình duyệt gọi thẳng Supabase (`cd_feedback_submit`); trình duyệt không đọc được bảng góp ý. Admin xem ở tab Góp ý.
 
 - Khách chưa đăng nhập hoặc vừa đăng xuất thấy trang đăng nhập 2 nửa: trái là form (bắt buộc tick xác nhận 18+), phải là ảnh admin chọn trong Admin → Cài đặt (slide chuyển ảnh mờ dần hoặc ảnh đơn, tối đa 12 ảnh, lưu tại `site/login/` trên B2).
 
@@ -98,7 +101,7 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 
 ## Quyền và dữ liệu
 
-Tất cả bảng bật RLS. `anon` và `authenticated` **không có quyền truy cập trực tiếp** các bảng ứng dụng hoặc RPC. Chỉ Worker được giữ service-role key. Worker xác thực token bằng Supabase `/auth/v1/user`, lấy ID từ kết quả xác thực, không nhận ID người thao tác từ client. RPC `cd_api` chỉ cho `service_role` và kiểm tra sở hữu/quyền theo từng thao tác. Các hàm đều `SECURITY INVOKER`, cố định `search_path`.
+Tất cả bảng bật RLS. `anon` và `authenticated` **không có quyền truy cập trực tiếp** các bảng ứng dụng hoặc RPC, trừ duy nhất `cd_feedback_submit` (chỉ ghi góp ý, có giới hạn tần suất). Chỉ Worker được giữ service-role key. Worker xác thực token bằng Supabase `/auth/v1/user`, lấy ID từ kết quả xác thực, không nhận ID người thao tác từ client. RPC `cd_api` chỉ cho `service_role` và kiểm tra sở hữu/quyền theo từng thao tác. Các hàm đều `SECURITY INVOKER`, cố định `search_path`.
 
 Quyền quản trị gắn với một email duy nhất trong `chich_private.settings` (mặc định `vinnielx@gmail.com`), so với email đã xác thực của Supabase Auth; không đọc quyền từ `user_metadata` hay tham số trình duyệt. Trang quản trị: `dist/admin.html`. Mọi truy cập dữ liệu riêng tư và thay đổi của admin được ghi vào `chich_private.admin_audit`. Vị trí và dữ liệu quản trị nằm trong schema riêng, không expose qua Data API.
 

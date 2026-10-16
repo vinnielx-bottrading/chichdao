@@ -2,9 +2,10 @@
 -- Chỉ dùng khi chưa có dữ liệu thật. Muốn giữ dữ liệu: dùng các file upgrade-*.sql.
 begin;
 drop function if exists public.cd_api(uuid,text,jsonb);
-drop table if exists public.cd_teasers, public.cd_reports, public.cd_messages, public.cd_blocks, public.cd_likes, public.cd_settings, public.cd_media, public.cd_profiles cascade;
+drop function if exists public.cd_feedback_submit(text,text);
+drop table if exists public.cd_feedback, public.cd_teasers, public.cd_reports, public.cd_messages, public.cd_blocks, public.cd_likes, public.cd_settings, public.cd_media, public.cd_profiles cascade;
 drop schema if exists chich_private cascade;
--- CHI.CH DAO. v0.7. Run once on a dedicated Supabase project.
+-- CHI.CH DAO. v0.8. Run once on a dedicated Supabase project.
 -- Browser roles intentionally have NO table/RPC access. The Worker validates
 -- Supabase access tokens with /auth/v1/user, then calls this service-only API.
 create schema if not exists chich_private;
@@ -77,7 +78,9 @@ create table public.cd_settings (
  hero_alt text not null default 'Sức hút từ những điều đời thường' check(length(hero_alt)<=160),
  -- Signed-out page: admin images on the right side, as a single image or a slideshow.
  login_mode text not null default 'slide' check(login_mode in ('single','slide')),
- login_interval integer not null default 6 check(login_interval between 3 and 30)
+ login_interval integer not null default 6 check(login_interval between 3 and 30),
+ -- Site colour theme, chosen by the admin (brand guideline schemes + navy/coral).
+ theme text not null default 'navy_coral' check(theme in ('navy_coral','navy_orange','black_red','charcoal_gold','forest_cream','cobalt_lime','cream_burgundy'))
 );
 insert into public.cd_settings(id) values(true);
 create table public.cd_likes (
@@ -126,6 +129,22 @@ create table public.cd_reports (
  resolved boolean not null default false, created_at timestamptz not null default now()
 );
 create index cd_reports_open on public.cd_reports(resolved,created_at desc);
+
+-- Guest/user feedback from the sign-in page. Browsers may only call cd_feedback_submit (rate-limited);
+-- they cannot read the table. IP and device id are stored only as salted hashes.
+create table public.cd_feedback (
+ id uuid primary key default gen_random_uuid(),
+ body text not null check(length(trim(body)) between 5 and 1000),
+ user_id uuid references auth.users(id) on delete set null,
+ client_hash text not null default '', ip_hash text not null default '', device text not null default '',
+ resolved boolean not null default false,
+ created_at timestamptz not null default now()
+);
+create index cd_feedback_time on public.cd_feedback(created_at desc);
+create index cd_feedback_client on public.cd_feedback(client_hash,created_at desc);
+create index cd_feedback_ip on public.cd_feedback(ip_hash,created_at desc);
+create table chich_private.secrets (id boolean primary key default true check(id), feedback_salt text not null default md5(random()::text||clock_timestamp()::text));
+insert into chich_private.secrets(id) values(true);
 create table chich_private.locations (
  user_id uuid primary key references public.cd_profiles(id) on delete cascade,
  lat numeric(5,2) not null check(lat between -90 and 90),
@@ -148,14 +167,16 @@ alter table public.cd_blocks enable row level security;
 alter table public.cd_messages enable row level security;
 alter table public.cd_reports enable row level security;
 alter table public.cd_teasers enable row level security;
+alter table public.cd_feedback enable row level security;
+alter table chich_private.secrets enable row level security;
 alter table chich_private.accounts enable row level security;
 alter table chich_private.locations enable row level security;
 alter table chich_private.rate_limits enable row level security;
 alter table chich_private.settings enable row level security;
 alter table chich_private.activity enable row level security;
 alter table chich_private.admin_audit enable row level security;
-revoke all on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports,public.cd_teasers from public,anon,authenticated;
-grant select,insert,update,delete on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports,public.cd_teasers to service_role;
+revoke all on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports,public.cd_teasers,public.cd_feedback from public,anon,authenticated;
+grant select,insert,update,delete on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports,public.cd_teasers,public.cd_feedback to service_role;
 grant select,insert,update,delete on all tables in schema chich_private to service_role;
 
 create function chich_private.is_blocked(a uuid,b uuid) returns boolean
@@ -230,6 +251,30 @@ language sql stable security invoker set search_path='' as $$
   from public.cd_profiles q left join chich_private.accounts a on a.user_id=q.id group by 1 order by 2 desc limit 25) x
 $$;
 
+
+-- The ONLY function browsers may call directly (anon + authenticated). One feedback per device per 24h,
+-- at most 5 per network address per 24h (shared mobile IPs), plus a global flood cap.
+create function public.cd_feedback_submit(p_body text, p_client text default '') returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare salt text; hdr json; ip text; v_uid uuid; ch text; ih text;
+begin
+ if coalesce(length(trim(p_body)),0) not between 5 and 1000 then raise exception 'Góp ý cần từ 5 đến 1000 ký tự.'; end if;
+ select feedback_salt into salt from chich_private.secrets where id;
+ hdr:=coalesce(nullif(current_setting('request.headers',true),''),'{}')::json;
+ ip:=trim(split_part(coalesce(hdr->>'cf-connecting-ip',hdr->>'x-forwarded-for',hdr->>'x-real-ip',''),',',1));
+ begin v_uid:=nullif(current_setting('request.jwt.claims',true)::json->>'sub','')::uuid; exception when others then v_uid:=null; end;
+ if v_uid is not null and not exists(select 1 from auth.users where id=v_uid) then v_uid:=null; end if;
+ ch:=case when coalesce(p_client,'')~'^[A-Za-z0-9-]{8,64}$' then md5(salt||'c'||p_client) else '' end;
+ ih:=case when ip<>'' then md5(salt||'i'||ip) else '' end;
+ if (ch<>'' and exists(select 1 from public.cd_feedback where client_hash=ch and created_at>now()-interval '24 hours'))
+  or (v_uid is not null and exists(select 1 from public.cd_feedback where user_id=v_uid and created_at>now()-interval '24 hours'))
+  or (ih<>'' and (select count(*) from public.cd_feedback where ip_hash=ih and created_at>now()-interval '24 hours')>=5)
+ then raise exception 'Bạn đã gửi góp ý trong 24 giờ qua. Cảm ơn bạn, hẹn bạn lần sau!'; end if;
+ if (select count(*) from public.cd_feedback where created_at>now()-interval '10 minutes')>=300 then raise exception 'Hệ thống đang nhận quá nhiều góp ý, vui lòng thử lại sau.'; end if;
+ insert into public.cd_feedback(body,user_id,client_hash,ip_hash,device) values(trim(p_body),v_uid,ch,ih,left(coalesce(hdr->>'user-agent',''),200));
+ return jsonb_build_object('ok',true);
+end $$;
+
 -- Sole service API. p_actor MUST come from verified Auth user, never request JSON.
 create function public.cd_api(p_actor uuid, p_action text, p_data jsonb default '{}') returns jsonb
 language plpgsql security invoker set search_path='' as $$
@@ -239,7 +284,7 @@ begin
  if current_user<>'service_role' then raise exception 'Forbidden'; end if;
  -- Auth-independent public hero; returns only the selected, ready hero.
  if p_action='hero' then
-  return (select jsonb_build_object('mediaId',s.hero_media_id,'alt',s.hero_alt,'loginMode',s.login_mode,'loginInterval',s.login_interval,
+  return (select jsonb_build_object('mediaId',s.hero_media_id,'alt',s.hero_alt,'theme',s.theme,'loginMode',s.login_mode,'loginInterval',s.login_interval,
    'slides',coalesce((select jsonb_agg(md.id order by md.position,md.created_at) from public.cd_media md where md.purpose='slide' and md.status='ready'),'[]'::jsonb)) from public.cd_settings s where id);
  end if;
  if p_action='cleanup_list' then
@@ -414,7 +459,8 @@ begin
      'nearby',(select count(*) from chich_private.locations where updated_at>now()-interval '24 hours'),
      'installed',(select count(*) from chich_private.accounts where app_installed_at is not null),
      'chatMedia',(select count(*) from public.cd_media where purpose='chat' and status='ready'),
-     'teases',(select count(*) from public.cd_messages where kind='tease')),
+     'teases',(select count(*) from public.cd_messages where kind='tease'),
+     'feedbackOpen',(select count(*) from public.cd_feedback where not resolved)),
     'signups',chich_private.daily('signup'),
     'active',chich_private.daily('active'),
     'messagesDaily',chich_private.daily('message'),
@@ -522,6 +568,22 @@ begin
    update public.cd_settings set login_mode=coalesce(nullif(p_data->>'mode',''),login_mode),login_interval=least(30,greatest(3,coalesce((p_data->>'interval')::int,login_interval))) where id;
    insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'login_settings',jsonb_build_object('mode',p_data->>'mode','interval',p_data->>'interval'));
    return '{}';
+  elsif p_action='admin_theme' then
+   if coalesce(p_data->>'theme','') not in ('navy_coral','navy_orange','black_red','charcoal_gold','forest_cream','cobalt_lime','cream_burgundy') then raise exception 'Giao diện không hợp lệ.'; end if;
+   update public.cd_settings set theme=p_data->>'theme' where id;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'theme',jsonb_build_object('theme',p_data->>'theme'));
+   return '{}';
+  elsif p_action='admin_feedback' then
+   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (
+    select f.id,f.body,f.resolved,f.created_at,f.user_id,f.device,chich_private.auth_email(f.user_id) email,q.name
+    from public.cd_feedback f left join public.cd_profiles q on q.id=f.user_id
+    where (coalesce(p_data->>'filter','open')='all' or (p_data->>'filter'='done' and f.resolved) or (coalesce(p_data->>'filter','open')='open' and not f.resolved))
+    order by f.created_at desc limit 100 offset least(10000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
+  elsif p_action='admin_feedback_resolve' then
+   update public.cd_feedback set resolved=coalesce((p_data->>'resolved')::boolean,true) where id=(p_data->>'id')::uuid; return '{}';
+  elsif p_action='admin_feedback_delete' then
+   delete from public.cd_feedback where id=(p_data->>'id')::uuid;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'feedback_delete',jsonb_build_object('feedback',p_data->>'id')); return '{}';
   elsif p_action='admin_teasers' then
    return coalesce((select jsonb_agg(to_jsonb(t) order by t.position,t.created_at) from public.cd_teasers t),'[]');
   elsif p_action='admin_teaser_save' then
@@ -595,4 +657,6 @@ revoke all on function chich_private.user_exists(uuid),chich_private.auth_email(
 grant execute on all functions in schema chich_private to service_role;
 revoke all on function public.cd_api(uuid,text,jsonb) from public,anon,authenticated;
 grant execute on function public.cd_api(uuid,text,jsonb) to service_role;
+revoke all on function public.cd_feedback_submit(text,text) from public;
+grant execute on function public.cd_feedback_submit(text,text) to anon,authenticated,service_role;
 commit;

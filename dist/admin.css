@@ -110,3 +110,11 @@ dialog::backdrop{background:rgba(3,8,15,.7)}
 .slide-badge{position:absolute;top:8px;left:8px;background:#0b1421cc}
 .slide-add{display:grid;place-items:center;align-content:center;gap:4px;min-height:200px;border:1px dashed #4a5a70;border-radius:12px;cursor:pointer;color:var(--muted);text-align:center;padding:12px}
 .slide-add span{font-size:30px;color:var(--orange)}.slide-add:hover{border-color:var(--orange)}
+
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:10px}
+.theme-card{position:relative;display:grid;gap:4px;text-align:left;padding:10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
+.theme-card:hover{border-color:#4a5a70}.theme-card.on{border-color:var(--orange);box-shadow:0 0 0 2px #ff791f44}
+.theme-sw{position:relative;display:grid;place-items:center;height:74px;border-radius:9px;background:var(--tb);overflow:hidden;margin-bottom:4px}
+.theme-sw img{width:78%;height:auto}.theme-sw i{position:absolute;right:8px;bottom:8px;width:34px;height:12px;border-radius:6px;background:var(--ta)}
+.theme-card b{font-size:12.5px}.theme-card small{font-size:10.5px;color:var(--muted)}
+.theme-card em{position:absolute;top:14px;right:14px;font-style:normal;font-size:10px;font-weight:700;background:var(--orange);color:#102035;border-radius:6px;padding:2px 6px}

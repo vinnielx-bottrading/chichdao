@@ -1,4 +1,5 @@
-import {api,config,hero,upload,removeMedia,signIn,signInPassword,signOut,supabase,configured} from './api.js';
+import {api,config,hero,upload,removeMedia,signIn,signInPassword,signOut,supabase,configured,sendFeedback} from './api.js';
+import {applyTheme} from './themes.js';
 import {occupations,bodyTypes,lifestyles,trainingStyles,photoValidationError} from './model.js';
 import {preparePhoto} from './album.js';
 import {regionOptions} from './regions.js';
@@ -134,6 +135,8 @@ document.addEventListener('click',async event=>{
  if(action==='dock-close'){closeDock();return;}
  if(action==='dock-tray'){dock.tray=!dock.tray;$('#dock-tray').hidden=!dock.tray;el.classList.toggle('on',dock.tray);if(dock.tray)await paintTray();return;}
  if(action==='dock-clear-attach'){dock.file=null;paintDockAttach();return;}
+ if(action==='feedback'){openFeedback();return;}
+ if(action==='feedback-close'){closeFeedback();return;}
  if(action==='close')$('#modal').close();
  if(action==='close-gallery'){$('#lightbox').close();$('#lightbox-content').innerHTML='';}
  if(action==='complete-profile'){go('profile');}
@@ -232,6 +235,23 @@ async function sendTease(teaserId,btn){if(!dock.id)return;btn.disabled=true;flam
 function paintDockAttach(text){const box=$('#dock-attach');if(!box)return;box.hidden=!dock.file;if(dock.file)box.innerHTML=text||`<span>${dock.file.type.startsWith('video/')?'🎬':'🖼'} ${esc(dock.file.name)} · ${(dock.file.size/1048576).toFixed(1)} MB</span><button type="button" class="text-button" data-action="dock-clear-attach">Bỏ</button>`;}
 function validateChatFile(f){if(f.type.startsWith('video/')){if(!['video/mp4','video/webm'].includes(f.type)||f.size>20*1024*1024)throw new Error('Video phải là MP4/WebM, tối đa 20 MB.');}else{const err=photoValidationError(f);if(err)throw new Error(err);}}
 async function sendChat(id,text,file,onStatus){let mediaId;if(file){onStatus?.('Đang chuẩn bị…',0);const blob=file.type.startsWith('image/')?(await preparePhoto(file)).blob:file;mediaId=await upload(blob,'chat',p=>onStatus?.('Đang tải lên…',p));}await api('send',{id,text,...(mediaId?{mediaId}:{})});}
+// ---------- Feedback (sign-in page + footer): small window, 1 per 24h ----------
+const FB_KEY='chich.feedback.at';
+function feedbackLocked(){try{return Date.now()-Number(localStorage.getItem(FB_KEY)||0)<864e5;}catch{return false;}}
+function openFeedback(){const pop=$('#feedback-pop');$('#fb-thanks').hidden=true;$('#feedback-form').hidden=false;$('#fb-status').textContent='';
+ const locked=feedbackLocked();$('#fb-body').disabled=locked;$('#feedback-form .button').disabled=locked;
+ if(locked)$('#fb-status').textContent='Bạn đã góp ý trong 24 giờ qua. Cảm ơn bạn, hẹn bạn lần sau!';
+ pop.hidden=false;requestAnimationFrame(()=>pop.classList.add('open'));if(!locked)$('#fb-body').focus();}
+function closeFeedback(){const pop=$('#feedback-pop');pop.classList.remove('open');setTimeout(()=>{pop.hidden=true;},200);}
+$('#fb-body').addEventListener('input',e=>{$('#fb-count').textContent=`${e.target.value.length}/1000`;});
+$('#feedback-form').addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('.button'),body=$('#fb-body').value.trim();
+ if(body.length<5){$('#fb-status').textContent='Góp ý cần ít nhất 5 ký tự.';return;}
+ b.disabled=true;$('#fb-status').textContent='Đang gửi…';
+ try{await sendFeedback(body);try{localStorage.setItem(FB_KEY,String(Date.now()));}catch{}$('#fb-body').value='';$('#fb-count').textContent='0/1000';
+  $('#feedback-form').hidden=true;$('#fb-thanks').hidden=false;setTimeout(closeFeedback,2600);}
+ catch(err){$('#fb-status').textContent=err.message;if(/24 giờ/.test(err.message)){try{localStorage.setItem(FB_KEY,String(Date.now()));}catch{}}}
+ finally{b.disabled=feedbackLocked();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#feedback-pop').hidden)closeFeedback();});
 // ---------- Install app (PWA) ----------
 function standalone(){return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}
 function isIOS(){return /iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
@@ -248,9 +268,10 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installProm
 window.addEventListener('appinstalled',()=>{installPrompt=null;recordInstalled();toast('Đã cài CHI.CH DAO. Mở từ biểu tượng trên màn hình của bạn.');});
 if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 route=['discover','liked','messages','profile','settings','admin'].includes(location.hash.slice(1))?location.hash.slice(1):'discover';
+applyTheme(document.documentElement.dataset.theme);
 $('#region-list').innerHTML=regionOptions();
 // Returning from Google (?code=) or with a saved session: show a short loader instead of flashing the 18+ / login popup.
 booting=!!supabase&&(/[?&]code=/.test(location.search)||(()=>{try{return Object.keys(localStorage).some(k=>/^sb-.+-auth-token$/.test(k));}catch{return false;}})());
 if(booting){document.body.classList.add('booting');setTimeout(()=>{if(booting&&!session)showAuth();},10000);}
-render();if(!booting)showAuth();hero().then(data=>{heroData=data;if(!$('#auth-screen').hidden)paintSlides();if(route==='discover'&&data?.src){$('.hero-photo').src=data.src;$('.hero-photo').alt=data.alt;}}).catch(()=>{});
+render();if(!booting)showAuth();hero().then(data=>{heroData=data;if(data?.theme)applyTheme(data.theme);if(!$('#auth-screen').hidden)paintSlides();if(route==='discover'&&data?.src){$('.hero-photo').src=data.src;$('.hero-photo').alt=data.alt;}}).catch(()=>{});
 if(supabase){supabase.auth.onAuthStateChange((event,s)=>{setTimeout(()=>authenticated(event,s),0);});}

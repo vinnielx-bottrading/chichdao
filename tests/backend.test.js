@@ -130,7 +130,23 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  const pub=await rpc(null,'hero');assert.deepEqual(pub.slides,[sl.id]);assert.equal(pub.loginMode,'single');assert.equal(pub.loginInterval,30);
  assert.equal((await rpc(null,'hero_file',{id:sl.id})).id,sl.id);
  assert.equal((await rpc(adminId,'admin_slides')).slides.length,1);
- await assert.rejects(()=>rpc(uid,'admin_slides'),/Forbidden/);await rpc(adminId,'claim_media',{id:hero.id});await rpc(adminId,'finish_media',{id:hero.id});await rpc(adminId,'admin_hero',{id:hero.id,alt:'Vườn cây'});
+ await assert.rejects(()=>rpc(uid,'admin_slides'),/Forbidden/);
+ // Theme chosen by admin, exposed publicly
+ await assert.rejects(()=>rpc(adminId,'admin_theme',{theme:'pink'}),/không hợp lệ/);
+ await rpc(adminId,'admin_theme',{theme:'cream_burgundy'});assert.equal((await rpc(null,'hero')).theme,'cream_burgundy');
+ // Feedback: anon may submit (rate-limited) but not read
+ await db.exec("reset role;set role anon;select set_config('request.headers','{\"x-forwarded-for\":\"203.0.113.9\"}',false)");
+ const fb=(body,client)=>db.query('select public.cd_feedback_submit($1,$2) v',[body,client]);
+ await assert.rejects(()=>fb('hi','device-aaaa-1111'),/5 đến 1000/);
+ await fb('Ứng dụng đẹp, thêm bộ lọc chiều cao nhé','device-aaaa-1111');
+ await assert.rejects(()=>fb('Góp ý lần hai trong ngày','device-aaaa-1111'),/24 giờ/);
+ for(let i=2;i<=5;i++)await fb('Góp ý từ thiết bị khác '+i,'device-bbbb-000'+i);
+ await assert.rejects(()=>fb('Thiết bị thứ sáu cùng mạng','device-cccc-0006'),/24 giờ/);
+ await assert.rejects(()=>db.query('select * from public.cd_feedback'),/permission denied/);
+ await db.exec('reset role;set role service_role');
+ const fl=await rpc(adminId,'admin_feedback');assert.equal(fl.length,5);assert.equal(JSON.stringify(fl).includes('203.0.113.9'),false);
+ await rpc(adminId,'admin_feedback_resolve',{id:fl[0].id});assert.equal((await rpc(adminId,'admin_feedback')).length,4);
+ await assert.rejects(()=>rpc(uid,'admin_feedback'),/Forbidden/);await rpc(adminId,'claim_media',{id:hero.id});await rpc(adminId,'finish_media',{id:hero.id});await rpc(adminId,'admin_hero',{id:hero.id,alt:'Vườn cây'});
  assert.equal((await rpc(null,'hero')).mediaId,hero.id);
  await assert.rejects(()=>rpc(null,'hero_file',{id:first.id}),/Không tìm/);
  await rpc(uid,'delete_media',{id:first.id});await rpc(null,'cleanup_done',{id:first.id});
@@ -200,12 +216,11 @@ test('upgrade-v0.6.sql upgrades a live v0.5 database without losing data',async(
   await db.exec('reset role');
   await db.exec(await readFile(new URL('../supabase/upgrade-v0.6.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/upgrade-v0.6.sql',import.meta.url),'utf8')); // re-runnable
-  await db.exec(await readFile(new URL('../supabase/upgrade-v0.7.sql',import.meta.url),'utf8'));
-  await db.exec(await readFile(new URL('../supabase/upgrade-v0.7.sql',import.meta.url),'utf8'));
+  for(const v of ['0.7','0.7','0.8','0.8'])await db.exec(await readFile(new URL(`../supabase/upgrade-v${v}.sql`,import.meta.url),'utf8'));
   await db.exec('set role service_role');
   assert.equal((await rpc(uid,'me')).name,'Anh A');
   assert.equal((await rpc(uid,'teasers')).length,6);
-  assert.equal((await rpc(null,'hero')).loginMode,'slide');
+  assert.equal((await rpc(null,'hero')).loginMode,'slide');assert.equal((await rpc(null,'hero')).theme,'navy_coral');
   await db.exec('reset role;set role anon');
   await assert.rejects(()=>db.query('select * from public.cd_teasers'),/permission denied/);
  }finally{await db.close();}

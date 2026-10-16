@@ -1,4 +1,4 @@
-CHI.CH DAO. export v0.7
-Frontend: dist/ (Vercel) · Admin: dist/admin.html
+CHI.CH DAO. export v0.8
+Frontend: dist/ (Vercel) · Admin: dist/admin.html · Themes: dist/themes.css + dist/themes.js
 API Worker: cloudflare/worker.js (unchanged since v0.6)
-Database: supabase/upgrade-v0.6.sql then upgrade-v0.7.sql (keep data) | supabase/schema.sql (fresh)
+Database: run upgrade-v0.6 → v0.7 → v0.8 (keep data) | schema.sql (fresh)

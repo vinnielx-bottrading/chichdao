@@ -1,5 +1,6 @@
 import {api,adminAuth,signIn,signInPassword,signOut,supabase,configured,upload,hero,config} from './api.js';
 import {preparePhoto} from './album.js';
+import {THEMES,themeById} from './themes.js';
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -10,9 +11,9 @@ const ago=s=>{if(!s)return '—';const m=Math.round((Date.now()-new Date(s))/600
 const bytes=b=>b>1048576?`${(b/1048576).toFixed(1)} MB`:`${Math.round((b||0)/1024)} KB`;
 const place=(o)=>[o.city||o.lastCity||o.last_city,o.country||o.lastCountry||o.last_country].filter(Boolean).join(', ')||'—';
 const EVENTS={SIGNED_IN:'Đăng nhập',INITIAL_SESSION:'Mở ứng dụng',session:'Mở ứng dụng',USER_UPDATED:'Cập nhật tài khoản',logout:'Đăng xuất',accept_adult:'Xác nhận 18+',profile_save:'Lưu hồ sơ',visibility:'Đổi hiển thị',location:'Bật vị trí',location_off:'Tắt vị trí',like:'Thích',unlike:'Bỏ thích',block:'Chặn',unblock:'Bỏ chặn',report:'Báo cáo',send:'Gửi tin nhắn',finish_media:'Tải ảnh/video',tease:'Thả thính 🔥',app_installed:'Cài ứng dụng',delete_media:'Xóa ảnh/video'};
-const AUDIT={view_user:'Xem hồ sơ',view_chat:'Đọc hội thoại',suspend:'Khóa/mở khóa',delete_media:'Xóa media',resolve_report:'Xử lý báo cáo',create_user:'Tạo người dùng',teaser_save:'Lưu câu thả thính',login_settings:'Cài đặt trang đăng nhập',teaser_delete:'Xóa câu thả thính',update_auth:'Đổi email/mật khẩu'};
+const AUDIT={view_user:'Xem hồ sơ',view_chat:'Đọc hội thoại',suspend:'Khóa/mở khóa',delete_media:'Xóa media',resolve_report:'Xử lý báo cáo',create_user:'Tạo người dùng',teaser_save:'Lưu câu thả thính',login_settings:'Cài đặt trang đăng nhập',theme:'Đổi giao diện',feedback_delete:'Xóa góp ý',teaser_delete:'Xóa câu thả thính',update_auth:'Đổi email/mật khẩu'};
 const ev=e=>EVENTS[e]||e;
-const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['teasers','Thả thính 🔥'],['audit','Nhật ký admin'],['settings','Cài đặt']];
+const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['teasers','Thả thính 🔥'],['feedback','Góp ý'],['audit','Nhật ký admin'],['settings','Cài đặt']];
 
 let me=null,tab='overview',charts=[],stats=null,authBusy=false,lastToken='';
 const state={users:{q:'',filter:'all',rows:[],done:false},media:{kind:'all',purpose:'all',rows:[],done:false},activity:{event:'all',rows:[],done:false},chats:{rows:[],a:'',b:'',done:false}};
@@ -41,7 +42,7 @@ $('#logout').onclick=async()=>{try{await api('logout');}catch{}await signOut();}
 /* ---------------- Routing ---------------- */
 function route(){const h=location.hash.slice(1);tab=TABS.some(([k])=>k===h)?h:'overview';renderTabs();render();}
 window.addEventListener('hashchange',()=>{if(me?.admin)route();});
-function renderTabs(){$('#tabs').innerHTML=TABS.map(([k,t])=>`<a class="tab ${k===tab?'active':''}" href="#${k}" ${k===tab?'aria-current="page"':''}>${t}${k==='reports'&&stats?.totals?.openReports?`<span class="badge">${stats.totals.openReports}</span>`:''}</a>`).join('');}
+function renderTabs(){$('#tabs').innerHTML=TABS.map(([k,t])=>`<a class="tab ${k===tab?'active':''}" href="#${k}" ${k===tab?'aria-current="page"':''}>${t}${k==='reports'&&stats?.totals?.openReports?`<span class="badge">${stats.totals.openReports}</span>`:''}${k==='feedback'&&stats?.totals?.feedbackOpen?`<span class="badge">${stats.totals.feedbackOpen}</span>`:''}</a>`).join('');}
 function destroyCharts(){charts.forEach(c=>c.destroy());charts=[];}
 async function render(){
  destroyCharts();const v=$('#view');v.innerHTML=empty('Đang tải…');
@@ -54,6 +55,7 @@ async function render(){
   if(tab==='reports')await reports();
   if(tab==='audit')await audit();
   if(tab==='teasers')await teasersView();
+  if(tab==='feedback')await feedbackView();
   if(tab==='settings')settingsView();
  }catch(e){v.innerHTML=empty(e.message);}
 }
@@ -80,7 +82,7 @@ async function overview(){
  const AGE=['18–24','25–29','30–34','35–39','40–49','50+','Chưa có'];stats.age=[...(stats.age||[])].sort((x,y)=>AGE.indexOf(x.label)-AGE.indexOf(y.label));
  const k=(label,value,sub='')=>`<div class="kpi"><span>${label}</span><b>${num(value)}</b>${sub?`<small>${sub}</small>`:''}</div>`;
  $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">TỔNG QUAN</span><h1>Bảng điều khiển</h1><p>Số liệu thời gian thực từ cơ sở dữ liệu · 30 ngày gần nhất theo giờ Việt Nam.</p></div><button class="btn" id="refresh">Làm mới</button></div>
- <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}${k('Đã cài app',t.installed)}${k('Ảnh/video trong chat',t.chatMedia)}${k('Lượt thả thính 🔥',t.teases)}</div>
+ <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}${k('Đã cài app',t.installed)}${k('Ảnh/video trong chat',t.chatMedia)}${k('Lượt thả thính 🔥',t.teases)}${k('Góp ý chưa xử lý',t.feedbackOpen)}</div>
  <div class="grid">
   ${chartCard('c-signups','Đăng ký mới theo ngày','Hồ sơ được tạo, 30 ngày',stats.signups)}
   ${chartCard('c-active','Người dùng hoạt động theo ngày','Số tài khoản có hoạt động mỗi ngày',stats.active)}
@@ -221,6 +223,14 @@ async function audit(){
  $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">MINH BẠCH</span><h1>Nhật ký quản trị</h1><p>Mọi lần xem hồ sơ, đọc tin nhắn và thay đổi của quản trị viên.</p></div></div>
  <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${list.map(a=>`<tr><td>${dt(a.created_at)}</td><td>${esc(AUDIT[a.action]||a.action)}</td><td>${a.target_id?`<button class="link" data-user="${a.target_id}">${esc(a.target_name||a.target_email||a.target_id)}</button>`:'—'}</td><td class="wrap faint">${esc(Object.entries(a.detail||{}).filter(([,v])=>v!==null&&v!==undefined).map(([k,v])=>`${k}: ${v}`).join(' · '))}</td></tr>`).join('')||`<tr><td colspan="4">${empty('Chưa có nhật ký.')}</td></tr>`}</tbody></table></div>`;
 }
+const fstate={filter:'open'};
+async function feedbackView(){
+ const list=await api('admin_feedback',{filter:fstate.filter});
+ $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">KHÁCH HÀNG</span><h1>Góp ý</h1><p>Gửi từ nút "Góp ý" ở trang đăng nhập và chân trang. Mỗi thiết bị 1 góp ý/24 giờ. Địa chỉ mạng chỉ lưu dạng mã hóa để chống spam.</p></div><div class="toolbar"><select id="fb-f" aria-label="Lọc"><option value="open">Chưa xử lý</option><option value="done">Đã xử lý</option><option value="all">Tất cả</option></select></div></div>
+ <div class="table-wrap"><table><thead><tr><th style="width:150px">Thời gian</th><th>Nội dung</th><th style="width:200px">Người gửi</th><th style="width:190px"></th></tr></thead><tbody>${list.map(f=>`<tr><td>${dt(f.created_at)}</td><td class="wrap">${esc(f.body)}</td><td>${f.user_id?`<button class="link" data-user="${f.user_id}">${esc(f.name||f.email||'Thành viên')}</button>`:'<span class="faint">Khách chưa đăng nhập</span>'}<br><span class="faint small">${esc(deviceShort(f.device))}</span></td><td><button class="btn" data-fb-done="${f.id}" data-v="${!f.resolved}">${f.resolved?'Mở lại':'Đã xử lý'}</button> <button class="btn danger" data-fb-del="${f.id}">Xóa</button></td></tr>`).join('')||`<tr><td colspan="4">${empty('Chưa có góp ý.')}</td></tr>`}</tbody></table></div>`;
+ $('#fb-f').value=fstate.filter;$('#fb-f').onchange=e=>{fstate.filter=e.target.value;feedbackView();};
+}
+function deviceShort(ua=''){const os=/iPhone|iPad/.test(ua)?'iOS':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac OS X/.test(ua)?'macOS':'';const br=/Edg\//.test(ua)?'Edge':/CocCoc|coc_coc/i.test(ua)?'Cốc Cốc':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'';return [os,br].filter(Boolean).join(' · ');}
 async function teasersView(){
  const list=await api('admin_teasers');
  $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">NỘI DUNG</span><h1>Câu thả thính 🔥</h1><p>Người dùng bấm 🔥 trên thẻ hồ sơ hoặc trong khung chat để gửi nhanh một câu dưới đây. Chỉ câu đang bật mới hiện cho người dùng; số thứ tự nhỏ hiện trước.</p></div></div>
@@ -229,9 +239,12 @@ async function teasersView(){
  $('#t-new').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{await api('admin_teaser_save',{body:f.body.value,active:f.active.checked});toast('Đã thêm câu thả thính.');teasersView();});};
 }
 async function settingsView(){
- let h=null,ls={mode:'slide',interval:6,slides:[]};try{h=await hero();}catch{}try{ls=await api('admin_slides');}catch(e){toast(e.message);}
+ let h=null,ls={mode:'slide',interval:6,slides:[]};try{h=await hero();}catch{}try{ls={...ls,...(await api('admin_slides'))};ls.slides=ls.slides||[];}catch(e){toast(e.message);}
  const src=id=>`${config.apiUrl}/hero/${encodeURIComponent(id)}`;
- $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">CÀI ĐẶT</span><h1>Hình ảnh trang web</h1><p>Ảnh được lưu trên Backblaze B2 và công khai cho khách chưa đăng nhập. Chỉ dùng ảnh bạn có quyền sử dụng.</p></div></div>
+ const cur=themeById(h?.theme).id;
+ $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">CÀI ĐẶT</span><h1>Giao diện & hình ảnh</h1><p>Ảnh được lưu trên Backblaze B2 và công khai cho khách chưa đăng nhập. Chỉ dùng ảnh bạn có quyền sử dụng.</p></div></div>
+ <section class="card" style="margin-bottom:18px"><h2>Giao diện màu</h2><p class="sub">Theo bộ nhận diện CHI.CH DAO. v1 (6 phối) + Navy · San hô. Áp dụng ngay cho mọi người dùng; đổi theo mùa tùy ý.</p>
+  <div class="theme-grid">${THEMES.map(t=>`<button class="theme-card ${t.id===cur?'on':''}" data-theme-pick="${t.id}" aria-pressed="${t.id===cur}" style="--tb:${t.bg};--ta:${t.accent};--tt:${t.text}"><span class="theme-sw"><img src="${t.logo}" alt=""><i></i></span><b>${esc(t.name)}</b><small>${esc(t.note)}</small>${t.id===cur?'<em>Đang dùng</em>':''}</button>`).join('')}</div></section>
  <section class="card" style="margin-bottom:18px"><div class="card-head"><div><h2>Trang đăng nhập (nửa bên phải)</h2><p class="sub">Hiện khi khách chưa đăng nhập hoặc vừa đăng xuất. Tối đa 12 ảnh. Ảnh dọc hoặc vuông, chủ thể ở giữa sẽ đẹp nhất.</p></div></div>
   <form id="ls-form" class="toolbar" style="margin-bottom:14px"><label>Kiểu hiển thị <select name="mode"><option value="slide" ${ls.mode==='slide'?'selected':''}>Slide chuyển ảnh</option><option value="single" ${ls.mode==='single'?'selected':''}>Ảnh đơn (ảnh đầu tiên)</option></select></label><label>Mỗi ảnh (giây) <input name="interval" type="number" min="3" max="30" value="${ls.interval}" style="width:80px"></label><button class="btn primary">Lưu cài đặt</button></form>
   <div class="slide-grid">${ls.slides.map((x,i)=>`<article class="slide-item"><img src="${safeURL(src(x.id))}" alt="Ảnh ${i+1}" loading="lazy"><div class="slide-meta"><label>Thứ tự <input type="number" value="${x.position}" data-s-pos="${x.id}" style="width:64px"></label><button class="btn" data-s-save="${x.id}">Lưu</button><button class="btn danger" data-del="${x.id}">Xóa</button></div>${i===0&&ls.mode==='single'?'<span class="tag hot slide-badge">Đang dùng</span>':''}</article>`).join('')}
@@ -249,9 +262,12 @@ async function settingsView(){
 
 /* ---------------- Global clicks ---------------- */
 document.addEventListener('click',async e=>{
- const el=e.target.closest('[data-user],[data-close],[data-thread],[data-view],[data-del],[data-resolve],[data-resolve-suspend],[data-t-save],[data-t-del],[data-s-save]');if(!el)return;
+ const el=e.target.closest('[data-user],[data-close],[data-thread],[data-view],[data-del],[data-resolve],[data-resolve-suspend],[data-t-save],[data-t-del],[data-s-save],[data-theme-pick],[data-fb-done],[data-fb-del]');if(!el)return;
  try{
   if(el.dataset.close!==undefined){closeDrawer();return;}
+  if(el.dataset.themePick){el.disabled=true;await api('admin_theme',{theme:el.dataset.themePick});toast(`Đã đổi giao diện: ${themeById(el.dataset.themePick).name}`);settingsView();return;}
+  if(el.dataset.fbDone){await api('admin_feedback_resolve',{id:el.dataset.fbDone,resolved:el.dataset.v==='true'});feedbackView();return;}
+  if(el.dataset.fbDel){if(!confirmInline(el,'Bấm lần nữa để xóa'))return;await api('admin_feedback_delete',{id:el.dataset.fbDel});toast('Đã xóa góp ý.');feedbackView();return;}
   if(el.dataset.sSave){const id=el.dataset.sSave;await api('admin_slide_order',{id,position:Number(document.querySelector(`[data-s-pos="${id}"]`).value)||0});toast('Đã lưu thứ tự.');settingsView();return;}
   if(el.dataset.tSave){const id=el.dataset.tSave;el.disabled=true;try{await api('admin_teaser_save',{id,body:document.querySelector(`[data-t-body="${id}"]`).value,active:document.querySelector(`[data-t-active="${id}"]`).checked,position:Number(document.querySelector(`[data-t-pos="${id}"]`).value)||0});toast('Đã lưu.');teasersView();}finally{el.disabled=false;}return;}
   if(el.dataset.tDel){if(!confirmInline(el,'Bấm lần nữa để xóa'))return;await api('admin_teaser_delete',{id:el.dataset.tDel});toast('Đã xóa.');teasersView();return;}

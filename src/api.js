@@ -27,3 +27,7 @@ export async function signIn(){if(!configured)throw new Error('Đăng nhập s�
 export async function signOut(){if(supabase){const {error}=await supabase.auth.signOut();if(error)throw error;}}
 export async function signInPassword(email,password){if(!configured)throw new Error('Đăng nhập sẽ mở khi dịch vụ sẵn sàng.');const {error}=await supabase.auth.signInWithPassword({email:String(email).trim(),password});if(error)throw new Error(/invalid/i.test(error.message)?'Email hoặc mật khẩu không đúng.':error.message);}
 export async function adminAuth(payload){return result(await fetch(`${config.apiUrl}/admin/auth`,{method:'POST',headers:{authorization:`Bearer ${await token()}`,'content-type':'application/json'},body:JSON.stringify(payload)}));}
+
+// Feedback goes straight to Supabase (cd_feedback_submit is the only browser-callable RPC; rate-limited server side).
+function clientId(){try{let id=localStorage.getItem('chich.client');if(!id){id=crypto.randomUUID();localStorage.setItem('chich.client',id);}return id;}catch{return '';}}
+export async function sendFeedback(body){if(!configured)throw new Error('Dịch vụ chưa sẵn sàng.');const {error}=await supabase.rpc('cd_feedback_submit',{p_body:String(body||'').trim(),p_client:clientId()});if(error)throw new Error(error.message||'Chưa gửi được góp ý.');}
