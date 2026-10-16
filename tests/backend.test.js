@@ -1,0 +1,89 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+import worker,{boundedBody,sniffMime,signMedia,verifyMedia,allowedOrigin} from '../worker/index.js';
+const uid='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',third='33333333-3333-4333-8333-333333333333';
+test('database authorization, album limits, nearby privacy and ownership',async()=>{
+ const db=new PGlite();
+ try{
+ await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+ create schema auth; create table auth.users(id uuid primary key);grant usage on schema auth to service_role;grant select on auth.users to service_role;
+ insert into auth.users values ('${uid}'),('${other}'),('${third}');`);
+ await db.exec(await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8'));
+ const rpc=async(actor,action,data={})=>(await db.query('select public.cd_api($1,$2,$3::jsonb) as value',[actor,action,JSON.stringify(data)])).rows[0].value;
+ await db.exec('set role anon');
+ await assert.rejects(()=>rpc(uid,'me'),/permission denied/);
+ await assert.rejects(()=>db.query('select * from public.cd_profiles'),/permission denied/);
+ await db.exec('reset role;set role authenticated');
+ await assert.rejects(()=>rpc(uid,'me'),/permission denied/);
+ await assert.rejects(()=>db.query('select * from chich_private.locations'),/permission denied/);
+ await db.exec('reset role;set role service_role');
+ assert.equal((await db.query("select chich_private.search_key('Nông dân ĐỨC') as value")).rows[0].value,'nong dan duc');
+ for(const id of [uid,other,third]){
+  assert.equal((await rpc(id,'me')).complete,false);
+  await rpc(id,'accept_adult');
+  await rpc(id,'profile_save',{name:id===uid?'Anh A':'Anh B',age:29,city:'Hà Nội',bio:'Mình thích những câu chuyện chân thành.',intent:'Mối quan hệ nghiêm túc'});
+ }
+ await assert.rejects(()=>rpc(uid,'admin_reports'),/Forbidden/);
+ await assert.rejects(()=>rpc(uid,'reserve_media',{kind:'image',purpose:'hero',bytes:15,mime:'image/jpeg'}),/Forbidden/);
+ const add=async(id,kind='image')=>{
+  const m=await rpc(id,'reserve_media',{kind,bytes:15,mime:kind==='image'?'image/jpeg':'video/mp4'});
+  await rpc(id,'claim_media',{id:m.id});await rpc(id,'finish_media',{id:m.id});return m;
+ };
+ const first=await add(uid);await add(other);await add(third);
+ assert.equal((await rpc(uid,'me')).complete,true);
+ for(let i=1;i<10;i++)await add(uid);
+ await assert.rejects(()=>add(uid),/giới hạn/);
+ await add(uid,'video');await add(uid,'video');await assert.rejects(()=>add(uid,'video'),/giới hạn/);
+ await assert.rejects(()=>rpc(other,'delete_media',{id:first.id}),/Không tìm/);
+ await assert.rejects(()=>rpc(other,'claim_media',{id:first.id}),/hết hạn/);
+ await rpc(uid,'location',{lat:21.02781,lon:105.83418});
+ await rpc(other,'location',{lat:21.035,lon:105.840});
+ await rpc(third,'location',{lat:10.8,lon:106.6});
+ const nearby=await rpc(uid,'discover',{radius:5});
+ assert.equal(nearby.length,1);assert.equal(nearby[0].id,other);
+ assert.equal(nearby[0].distance,'Trong khoảng 5 km');
+ assert.equal(JSON.stringify(nearby).includes('105.'),false);
+ assert.equal('lat' in nearby[0],false);
+ await assert.rejects(()=>rpc(uid,'location',{lat:22,lon:105}),/quá nhanh/);
+ await rpc(uid,'send',{id:other,text:'Xin chào'});
+ assert.equal((await rpc(other,'messages',{id:uid})).length,1);
+ assert.equal((await rpc(third,'messages',{id:uid})).length,0);
+ await rpc(other,'block',{id:uid});
+ await assert.rejects(async()=>rpc(uid,'media_file',{id:(await rpc(other,'me')).photos[0].id}),/Không tìm/);
+ assert.equal((await rpc(uid,'discover',{radius:5})).length,0);
+ await assert.rejects(()=>rpc(uid,'send',{id:other,text:'Bị chặn'}),/không khả dụng/);
+ await rpc(other,'unblock',{id:uid});await rpc(other,'visibility',{visible:false});
+ assert.equal((await rpc(uid,'discover',{radius:5})).length,0);
+ await rpc(uid,'location_off');await assert.rejects(()=>rpc(uid,'discover',{radius:5}),/bật vị trí/);
+ await db.exec('reset role');
+ const insecure=(await db.query("select relname from pg_class where relnamespace in ('public'::regnamespace,'chich_private'::regnamespace) and relkind='r' and not relrowsecurity")).rows;
+ assert.deepEqual(insecure,[]);
+ await db.query('update chich_private.accounts set is_admin=true where user_id=$1',[uid]);
+ await db.exec('set role service_role');
+ const hero=await rpc(uid,'reserve_media',{kind:'image',purpose:'hero',mime:'image/jpeg',bytes:15});
+ await rpc(uid,'claim_media',{id:hero.id});await rpc(uid,'finish_media',{id:hero.id});await rpc(uid,'admin_hero',{id:hero.id,alt:'Vườn cây'});
+ assert.equal((await rpc(null,'hero')).mediaId,hero.id);
+ await assert.rejects(()=>rpc(null,'hero_file',{id:first.id}),/Không tìm/);
+ await rpc(uid,'delete_media',{id:first.id});await rpc(null,'cleanup_done',{id:first.id});
+ assert.equal((await rpc(uid,'me')).photos.filter(x=>x.kind==='image').length,9);
+ }finally{await db.close();}
+});
+test('signed media tokens bind viewer, file and expiry',async()=>{
+ const expiry=Math.floor(Date.now()/1000)+600,secret='a-secure-test-secret-32-characters';
+ const sig=await signMedia(secret,uid,other,expiry);
+ assert.equal(await verifyMedia(secret,uid,other,expiry,sig),true);
+ assert.equal(await verifyMedia(secret,uid,third,expiry,sig),false);
+ assert.equal(await verifyMedia(secret,uid,other,1,sig),false);
+ assert.equal(await verifyMedia(secret,uid,other,expiry,'bad'),false);
+});
+test('uploads reject oversized streams and spoofed content',async()=>{
+ const req=new Request('https://example.test',{method:'POST',body:new Uint8Array(30)});
+ await assert.rejects(()=>boundedBody(req,20),/giới hạn/);
+ assert.equal(sniffMime(new TextEncoder().encode('<svg onload=alert(1)>')),'');
+ assert.equal(sniffMime(Uint8Array.from([255,216,255,0,0,0,0,0,0,0,0,0])),'image/jpeg');
+ assert.equal(allowedOrigin('https://evil.test',{ALLOWED_ORIGINS:'https://example.test'}),false);
+ const response=await worker.fetch(new Request('https://example.test/api',{method:'POST'}),{});
+ assert.equal(response.status,503);
+});

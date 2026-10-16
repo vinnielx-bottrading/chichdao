@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101d2d"><meta name="description" content="CHI.CH DAO. — Cùng gu hình thể. Hợp gu hẹn hò. Không gian hẹn hò nam–nam 18+ cho những người cùng gu hình thể và lối sống.">
+  <title>CHI.CH DAO. — Cùng gu, cùng tần số</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Đến nội dung</a>
+  <aside class="sidebar">
+    <a class="brand" href="#discover" aria-label="CHI.CH DAO. Trang khám phá"><img src="assets/logo.png" alt="CHI.CH DAO."></a>
+    <div class="brand-caption">CÙNG GU. CÙNG TẦN SỐ.</div>
+    <nav aria-label="Điều hướng chính" id="nav"></nav>
+    <div class="side-note"><span class="eyebrow">MORE THAN MUSCLE</span><h3>Hình thể thu hút.<br>Tính cách giữ chân.</h3><p>Một kết nối tốt bắt đầu từ sự tôn trọng.</p><button class="text-button" data-action="safety">Hẹn hò an tâm <span>↗</span></button></div>
+    <div class="side-bottom"><span class="pill">18+</span><span>Không gian dành cho nam giới</span></div>
+    <button class="user-mini" data-nav="profile"><span class="avatar-letter">B</span><span><b>Hồ sơ của bạn</b><small>Thiết lập gu kết nối</small></span><span>↗</span></button>
+  </aside>
+  <div class="mobile-top"><a href="#discover" aria-label="CHI.CH DAO."><img src="assets/logo.png" alt="CHI.CH DAO."></a><span class="pill">18+</span></div>
+  <main id="main" tabindex="-1">
+    <header class="topbar"><div><span class="small-brand">THE CONNECTION CLUB</span><span class="top-divider"></span><span class="muted">Dành cho những kết nối có gu</span></div><button class="top-profile" data-nav="profile" aria-label="Mở hồ sơ của bạn"><span class="avatar-letter small">B</span></button></header>
+    <div id="page"></div>
+    <footer><span>CHI.CH DAO. <span class="muted">/ Cùng gu, cùng tần số.</span></span><div><button data-action="privacy-info">Quyền riêng tư</button><button data-action="safety">Nguyên tắc cộng đồng</button><button data-action="about">Về CHI.CH DAO.</button></div></footer>
+  </main>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Điều hướng điện thoại"></nav>
+  <dialog id="modal" aria-label="Chi tiết"><div id="modal-content"></div></dialog>
+  <dialog id="lightbox" aria-label="Xem album ảnh"><div id="lightbox-content"></div></dialog>
+  <dialog id="age-gate" aria-label="Chào mừng và đăng nhập">
+    <div class="onboarding-window"><div class="onboarding-track" id="onboarding-track">
+      <section class="age-content onboarding-step" id="welcome-step" aria-labelledby="age-title">
+        <img src="assets/logo.png" alt="CHI.CH DAO."><span class="eyebrow">MỘT KHÔNG GIAN CÙNG GU</span>
+        <h1 id="age-title">Kết nối bắt đầu<br>từ sự tôn trọng.</h1>
+        <p>Không gian hẹn hò nam–nam dành cho người <strong>từ 18 tuổi trở lên</strong>. Cùng gu hình thể, hợp gu hẹn hò.</p>
+        <label class="check-line"><input id="age-check" type="checkbox"> Tôi xác nhận mình từ 18 tuổi và đồng ý với nguyên tắc tôn trọng, có sự đồng thuận.</label>
+        <button id="enter-app" class="button primary" disabled>Khám phá cùng gu <span>↗</span></button>
+        <button id="underage" class="text-button">Tôi chưa đủ 18 tuổi</button><p id="age-note" class="fine-print">Bạn luôn có quyền quyết định điều muốn chia sẻ.</p>
+      </section>
+      <section class="age-content onboarding-step" id="login-step" aria-labelledby="login-title" inert>
+        <img src="assets/logo.png" alt="CHI.CH DAO."><span class="eyebrow">MỘT BƯỚC ĐẾN GẦN NHAU</span>
+        <h1 id="login-title" tabindex="-1">Đúng gu.<br>Đúng là bạn.</h1><p>Đăng nhập để khám phá, lưu người bạn thích và bắt đầu câu chuyện của riêng mình.</p>
+        <button id="google-login" class="button google-button"><span aria-hidden="true">G</span> Tiếp tục với Google</button>
+        <p id="login-status" role="status" class="fine-print"></p>
+        <p class="fine-print">Tên và ảnh từ Google không tự động xuất hiện trên hồ sơ hẹn hò. Bạn chọn thông tin muốn chia sẻ.</p>
+        <button id="back-welcome" class="text-button">← Quay lại</button>
+        <div class="auth-links"><button data-action="privacy-info">Quyền riêng tư</button><button data-action="safety">Nguyên tắc cộng đồng</button></div>
+      </section>
+    </div></div>
+  </dialog>
+  <dialog id="profile-reminder" aria-labelledby="reminder-title"><div class="age-content"><span class="eyebrow">HÃY ĐỂ MỌI NGƯỜI BIẾT BẠN</span><h2 id="reminder-title">Thêm một chút về bạn.</h2><p>Hoàn thiện hồ sơ để xuất hiện trong Khám phá và bắt đầu trò chuyện.</p><ul id="profile-checklist"></ul><button class="button primary" data-action="complete-profile">Cập nhật hồ sơ ↗</button><button class="text-button" data-action="remind-later">Để sau</button></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body></html>
