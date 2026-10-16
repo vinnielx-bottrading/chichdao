@@ -459,7 +459,7 @@ async function readFile(req, env, media, { thumb = false, cache = "private, max-
   for (const key of ["content-length", "content-range"]) if (upstream.headers.has(key)) headers.set(key, upstream.headers.get(key));
   return new Response(upstream.body, { status: upstream.status, headers });
 }
-async function authAdmin(req, env, user) {
+async function authAdmin(req, env, user, ctx) {
   const me = await rpc(env, user.id, "me", {});
   if (!me.admin) throw new HttpError(403, "Ch\u1EC9 qu\u1EA3n tr\u1ECB vi\xEAn \u0111\u01B0\u1EE3c th\u1EF1c hi\u1EC7n.");
   const body = await jsonBody(req), op = body.op;
@@ -479,6 +479,15 @@ async function authAdmin(req, env, user) {
     url = `${env.SUPABASE_URL}/auth/v1/admin/users/${body.id}`;
     method = "PUT";
     payload = { ...email ? { email, email_confirm: true } : {}, ...password ? { password } : {} };
+  } else if (op === "delete") {
+    if (!UUID.test(body.id || "")) throw new HttpError(400, "Ng\u01B0\u1EDDi d\xF9ng kh\xF4ng h\u1EE3p l\u1EC7.");
+    if (body.id === user.id) throw new HttpError(400, "Kh\xF4ng th\u1EC3 x\xF3a t\xE0i kho\u1EA3n qu\u1EA3n tr\u1ECB.");
+    await rpc(env, user.id, "admin_audit_add", { action: "delete_user", target: body.id, detail: { email: email || null } });
+    const r2 = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${body.id}`, { method: "DELETE", headers: serviceHeaders(env) });
+    if (!r2.ok && r2.status !== 404) throw new HttpError(400, "Kh\xF4ng x\xF3a \u0111\u01B0\u1EE3c t\xE0i kho\u1EA3n.");
+    ctx?.waitUntil?.(cleanupNow(env).catch(() => {
+    }));
+    return json({ deleted: true });
   } else throw new HttpError(400, "Thao t\xE1c kh\xF4ng h\u1EE3p l\u1EC7.");
   const r = await fetch(url, { method, headers: serviceHeaders(env), body: JSON.stringify(payload) });
   const result = await r.json().catch(() => ({}));
@@ -552,7 +561,7 @@ async function handle(req, env, ctx) {
     }));
     return json(await hydrate(result, user.id, url.origin, env));
   }
-  if (req.method === "POST" && path === "/admin/auth") return authAdmin(req, env, user);
+  if (req.method === "POST" && path === "/admin/auth") return authAdmin(req, env, user, ctx);
   if (req.method === "POST" && path === "/admin/fetch-image") return fetchImage(req, env, user);
   if (req.method === "POST" && path === "/uploads") {
     requireStorage(env);

@@ -370,7 +370,21 @@ async function installApp(){
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;updateInstall();});
 window.addEventListener('appinstalled',()=>{installPrompt=null;recordInstalled();toast('Đã cài CHI.CH DAO. Mở từ biểu tượng trên màn hình của bạn.');});
-if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').then(reg=>{
+ // New deploys: check every 15 min; when a new version takes over, offer a reload (or reload quietly if the tab is in the background).
+ setInterval(()=>reg.update().catch(()=>{}),15*60*1000);
+ let had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had){had=true;return;}if(document.hidden&&!document.querySelector('.dock-win input[name=text]')?.value){location.reload();return;}showUpdateBar();});
+}).catch(()=>{}));
+function showUpdateBar(){if($('#update-bar'))return;const b=document.createElement('div');b.id='update-bar';b.className='update-bar';b.setAttribute('role','status');b.innerHTML='<span>✨ CHI.CH DAO. vừa có tính năng mới.</span><button class="button primary small" type="button">Cập nhật</button><button class="note-x" type="button" aria-label="Để sau">×</button>';document.body.appendChild(b);b.querySelector('.button').onclick=()=>location.reload();b.querySelector('.note-x').onclick=()=>b.remove();}
+// Admin settings (theme, grid, sign-in photos, hero) reach open pages within about a minute — no reload needed.
+function applyGrid(d){const r=document.documentElement,gc=Math.min(6,Math.max(2,Number(d?.gridCols)||3)),gm=Math.min(2,Math.max(1,Number(d?.gridColsMobile)||2));r.style.setProperty('--gc',gc);r.style.setProperty('--gct',Math.min(gc,2));r.style.setProperty('--gcm',gm);r.dataset.gc=gc;r.dataset.gcm=gm;}
+applyGrid(heroData);
+async function refreshSite(){if(document.hidden)return;let data;try{data=await hero();}catch{return;}if(!data)return;const old=heroData||{};heroData=data;try{localStorage.setItem('chich.hero',JSON.stringify(data));}catch{}
+ if(data.theme&&data.theme!==old.theme)applyTheme(data.theme);applyGrid(data);
+ if(JSON.stringify([data.slides,data.loginMode,data.loginInterval])!==JSON.stringify([old.slides,old.loginMode,old.loginInterval])&&!$('#auth-screen').hidden)paintSlides();
+ const hp=$('.hero-photo');if(hp&&data.src&&hp.getAttribute('src')!==data.src){hp.src=data.src;hp.alt=data.alt||'';hp.hidden=false;}
+ teasers=null;}
+setInterval(refreshSite,60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshSite();});
 route=['discover','liked','messages','profile','settings','admin'].includes(location.hash.slice(1))?location.hash.slice(1):'discover';
 try{const q=new URLSearchParams(location.search).get('chat');if(q&&/^[0-9a-f-]{36}$/i.test(q)){chatId=q;history.replaceState(null,'',location.pathname+location.hash);}}catch{}
 applyTheme(document.documentElement.dataset.theme);
@@ -378,7 +392,7 @@ $('#region-list').innerHTML=regionOptions();
 // Returning from Google (?code=) or with a saved session: show a short loader instead of flashing the 18+ / login popup.
 booting=!!supabase&&configured&&(/[?&]code=/.test(location.search)||(()=>{try{return Object.keys(localStorage).some(k=>/^sb-.+-auth-token$/.test(k));}catch{return false;}})());
 if(booting){document.body.classList.add('booting');setTimeout(()=>{if(booting&&!session)showAuth();},10000);}
-render();if(!booting)showAuth();hero().then(data=>{const changed=JSON.stringify(data)!==JSON.stringify(heroData);heroData=data;try{localStorage.setItem('chich.hero',JSON.stringify(data));}catch{}if(data?.theme)applyTheme(data.theme);if(changed&&!$('#auth-screen').hidden)paintSlides();const hp=$('.hero-photo');if(route==='discover'&&hp&&data?.src){hp.src=data.src;hp.alt=data.alt;hp.hidden=false;}}).catch(()=>{});
+render();if(!booting)showAuth();hero().then(data=>{const changed=JSON.stringify(data)!==JSON.stringify(heroData);heroData=data;try{localStorage.setItem('chich.hero',JSON.stringify(data));}catch{}if(data?.theme)applyTheme(data.theme);applyGrid(data);if(changed&&!$('#auth-screen').hidden)paintSlides();const hp=$('.hero-photo');if(route==='discover'&&hp&&data?.src){hp.src=data.src;hp.alt=data.alt;hp.hidden=false;}}).catch(()=>{});
 if(supabase&&configured){supabase.auth.onAuthStateChange((event,s)=>{setTimeout(()=>authenticated(event,s),0);});}
 
 // ---------- Live updates (no WebSocket: polling only while the tab is visible) ----------

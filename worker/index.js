@@ -114,7 +114,7 @@ async function readFile(req,env,media,{thumb=false,cache='private, max-age=600'}
  return new Response(upstream.body,{status:upstream.status,headers});
 }
 // ---------- Admin: Supabase Auth Admin API (create user, change email/password) ----------
-async function authAdmin(req,env,user){
+async function authAdmin(req,env,user,ctx){
  const me=await rpc(env,user.id,'me',{});if(!me.admin)throw new HttpError(403,'Chỉ quản trị viên được thực hiện.');
  const body=await jsonBody(req),op=body.op;
  const email=typeof body.email==='string'?body.email.trim().toLowerCase():'',password=typeof body.password==='string'?body.password:'';
@@ -129,6 +129,16 @@ async function authAdmin(req,env,user){
   if(!email&&!password)throw new HttpError(400,'Nhập email mới hoặc mật khẩu mới.');
   if(email&&body.id===user.id)throw new HttpError(400,'Không đổi email của tài khoản quản trị tại đây; quyền admin gắn với email này.');
   url=`${env.SUPABASE_URL}/auth/v1/admin/users/${body.id}`;method='PUT';payload={...(email?{email,email_confirm:true}:{}),...(password?{password}:{})};
+ }else if(op==='delete'){
+  // Permanent: removes the login account; the database cascades profile, photos, likes, messages,
+  // and queues every file for deletion from B2 (cleaned right away below).
+  if(!UUID.test(body.id||''))throw new HttpError(400,'Người dùng không hợp lệ.');
+  if(body.id===user.id)throw new HttpError(400,'Không thể xóa tài khoản quản trị.');
+  await rpc(env,user.id,'admin_audit_add',{action:'delete_user',target:body.id,detail:{email:email||null}});
+  const r=await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${body.id}`,{method:'DELETE',headers:serviceHeaders(env)});
+  if(!r.ok&&r.status!==404)throw new HttpError(400,'Không xóa được tài khoản.');
+  ctx?.waitUntil?.(cleanupNow(env).catch(()=>{}));
+  return json({deleted:true});
  }else throw new HttpError(400,'Thao tác không hợp lệ.');
  const r=await fetch(url,{method,headers:serviceHeaders(env),body:JSON.stringify(payload)});
  const result=await r.json().catch(()=>({}));
@@ -174,7 +184,7 @@ async function handle(req,env,ctx){
   if(action==='admin_delete_media'){const m=await rpc(env,user.id,'admin_delete_media',payload);await deleteObject(env,m).catch(()=>{});return json({deleted:true});}
   const result=await rpc(env,user.id,action,payload);if(CLEANUP_AFTER.has(action))ctx?.waitUntil?.(cleanupNow(env).catch(()=>{}));return json(await hydrate(result,user.id,url.origin,env));
  }
- if(req.method==='POST'&&path==='/admin/auth')return authAdmin(req,env,user);
+ if(req.method==='POST'&&path==='/admin/auth')return authAdmin(req,env,user,ctx);
  if(req.method==='POST'&&path==='/admin/fetch-image')return fetchImage(req,env,user);
  if(req.method==='POST'&&path==='/uploads'){
   requireStorage(env);

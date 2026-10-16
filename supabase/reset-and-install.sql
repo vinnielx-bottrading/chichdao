@@ -84,7 +84,10 @@ create table public.cd_settings (
  -- Site colour theme, chosen by the admin (brand guideline schemes + navy/coral).
  theme text not null default 'navy_coral' check(theme in ('navy_coral','navy_orange','black_red','charcoal_gold','forest_cream','cobalt_lime','cream_burgundy')),
  -- Clearly-labelled illustration profiles in Discover (cannot be messaged/liked). Off by default.
- samples_enabled boolean not null default false
+ samples_enabled boolean not null default false,
+ -- Discover grid: profile cards per row (desktop / phone).
+ grid_cols integer not null default 3 check(grid_cols between 2 and 6),
+ grid_cols_mobile integer not null default 2 check(grid_cols_mobile between 1 and 2)
 );
 insert into public.cd_settings(id) values(true);
 create table public.cd_likes (
@@ -356,13 +359,13 @@ $$;
 -- Sole service API. p_actor MUST come from verified Auth user, never request JSON.
 create function public.cd_api(p_actor uuid, p_action text, p_data jsonb default '{}') returns jsonb
 language plpgsql security invoker set search_path='' as $$
-declare p public.cd_profiles; m public.cd_media; v_msg public.cd_messages; result jsonb; target uuid; v_media uuid;
+declare p public.cd_profiles; m public.cd_media; v_msg public.cd_messages; result jsonb; target uuid; v_media uuid; v_ids uuid[];
  admin boolean; n integer; k text; v_purpose text; loc chich_private.locations; radius integer;
 begin
  if current_user<>'service_role' then raise exception 'Forbidden'; end if;
  -- Auth-independent public hero; returns only the selected, ready hero.
  if p_action='hero' then
-  return (select jsonb_build_object('mediaId',s.hero_media_id,'alt',s.hero_alt,'theme',s.theme,'loginMode',s.login_mode,'loginInterval',s.login_interval,
+  return (select jsonb_build_object('mediaId',s.hero_media_id,'alt',s.hero_alt,'theme',s.theme,'gridCols',s.grid_cols,'gridColsMobile',s.grid_cols_mobile,'loginMode',s.login_mode,'loginInterval',s.login_interval,
    'slides',coalesce((select jsonb_agg(md.id order by md.position,md.created_at) from public.cd_media md where md.purpose='slide' and md.status='ready'),'[]'::jsonb)) from public.cd_settings s where id);
  end if;
  if p_action='cleanup_list' then
@@ -656,8 +659,46 @@ begin
   update public.cd_media set status='deleting' where purpose='hero' and id<>m.id;
   return '{}';
   elsif p_action='admin_slides' then
-   return (select jsonb_build_object('mode',s.login_mode,'interval',s.login_interval,'chatDays',s.chat_media_days,
+   return (select jsonb_build_object('mode',s.login_mode,'interval',s.login_interval,'chatDays',s.chat_media_days,'gridCols',s.grid_cols,'gridColsMobile',s.grid_cols_mobile,
     'slides',coalesce((select jsonb_agg(jsonb_build_object('id',md.id,'position',md.position,'bytes',md.bytes,'createdAt',md.created_at) order by md.position,md.created_at) from public.cd_media md where md.purpose='slide' and md.status='ready'),'[]'::jsonb)) from public.cd_settings s where id);
+  elsif p_action='admin_grid' then
+   update public.cd_settings set grid_cols=least(6,greatest(2,coalesce((p_data->>'cols')::int,grid_cols))),grid_cols_mobile=least(2,greatest(1,coalesce((p_data->>'mobile')::int,grid_cols_mobile))) where id;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'grid',jsonb_build_object('cols',p_data->>'cols','mobile',p_data->>'mobile'));
+   return '{}';
+  elsif p_action='admin_messages_cleanup' then
+   -- Old messages between two people who have BOTH been inactive for at least N months (default 3).
+   -- dry=true only counts. Attached files are then removed from B2 by the cleanup job.
+   n=least(120,greatest(1,coalesce((p_data->>'months')::int,6)));radius=least(120,greatest(3,coalesce((p_data->>'inactiveMonths')::int,3)));
+   select coalesce(array_agg(mm.id),'{}') into v_ids from public.cd_messages mm
+    left join chich_private.accounts sa on sa.user_id=mm.sender_id left join chich_private.accounts ra on ra.user_id=mm.recipient_id
+    where mm.created_at<now()-make_interval(months=>n)
+     and coalesce(sa.last_seen_at,'-infinity'::timestamptz)<now()-make_interval(months=>radius)
+     and coalesce(ra.last_seen_at,'-infinity'::timestamptz)<now()-make_interval(months=>radius);
+   result=jsonb_build_object('messages',cardinality(v_ids),
+    'conversations',(select count(distinct least(mm.sender_id::text,mm.recipient_id::text)||greatest(mm.sender_id::text,mm.recipient_id::text)) from public.cd_messages mm where mm.id=any(v_ids)),
+    'media',(select count(*) from public.cd_messages mm where mm.id=any(v_ids) and mm.media_id is not null));
+   if not coalesce((p_data->>'dry')::boolean,true) and cardinality(v_ids)>0 then
+    update public.cd_media set status='deleting' where id in (select mm.media_id from public.cd_messages mm where mm.id=any(v_ids) and mm.media_id is not null);
+    delete from public.cd_messages where id=any(v_ids);
+    insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'messages_cleanup',result||jsonb_build_object('months',n,'inactiveMonths',radius));
+   end if;
+   return result;
+  elsif p_action='admin_teasers_save_all' then
+   -- Save the whole list in one go; order = position (1, 2, 3…). Rows without id are new; empty new rows are skipped.
+   if jsonb_typeof(p_data->'items')<>'array' or jsonb_array_length(p_data->'items')>300 then raise exception 'Danh sách không hợp lệ.'; end if;
+   if exists(select 1 from jsonb_array_elements(p_data->'items') x where length(trim(coalesce(x->>'body','')))>200 or (coalesce(x->>'id','')<>'' and length(trim(coalesce(x->>'body','')))=0)) then raise exception 'Mỗi câu thả thính cần 1–200 ký tự.'; end if;
+   n=0;
+   for result in select x from jsonb_array_elements(p_data->'items') x loop
+    if length(trim(coalesce(result->>'body','')))=0 then continue; end if;
+    n=n+1;
+    if coalesce(result->>'id','')='' then
+     insert into public.cd_teasers(body,active,position) values(trim(result->>'body'),coalesce((result->>'active')::boolean,true),n);
+    else
+     update public.cd_teasers set body=trim(result->>'body'),active=coalesce((result->>'active')::boolean,active),position=n where id=(result->>'id')::uuid;
+    end if;
+   end loop;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'teaser_save',jsonb_build_object('count',n));
+   return jsonb_build_object('count',n);
   elsif p_action='admin_chat_retention' then
    update public.cd_settings set chat_media_days=least(3650,greatest(0,coalesce((p_data->>'days')::int,0))) where id;
    insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'chat_retention',jsonb_build_object('days',p_data->>'days'));
