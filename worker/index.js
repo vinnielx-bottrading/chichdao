@@ -29,7 +29,7 @@ function json(body,status=200){return new Response(JSON.stringify(body),{status,
 async function rpc(env,actor,action,data={}){
  const response=await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/cd_api`,{method:'POST',headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'content-type':'application/json'},body:JSON.stringify({p_actor:actor,p_action:action,p_data:data})});
  const body=await response.json();
- if(!response.ok){const safe=body.code==='P0001'?body.message:'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin và thử lại.';throw new HttpError(body.message==='Forbidden'?403:400,safe);}
+ if(!response.ok){const safe=body.code==='P0001'?body.message:'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin và thử lại.';throw new HttpError(body.message==='Forbidden'?403:/quá nhanh/.test(body.message||'')?429:400,safe);}
  return body;
 }
 async function actor(req,env){

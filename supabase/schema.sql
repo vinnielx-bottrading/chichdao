@@ -106,6 +106,12 @@ create function chich_private.is_blocked(a uuid,b uuid) returns boolean
 language sql stable security invoker set search_path='' as $$
  select exists(select 1 from public.cd_blocks where (user_id=a and target_id=b) or (user_id=b and target_id=a))
 $$;
+-- service_role has no SELECT on auth.users in hosted Supabase. This narrow
+-- definer helper (owned by the migration owner) only answers "does this ID exist".
+create function chich_private.user_exists(uid uuid) returns boolean
+language sql stable security definer set search_path='' as $$
+ select exists(select 1 from auth.users where id=uid)
+$$;
 create function chich_private.search_key(t text) returns text
 language sql immutable security invoker set search_path='' as $$
  select translate(regexp_replace(normalize(lower(t),NFD),U&'[\0300-\036F]','','g'),'đ','d')
@@ -170,7 +176,7 @@ begin
   if m.id is null then raise exception 'Không tìm thấy ảnh.'; end if;
   return to_jsonb(m);
  end if;
- if p_actor is null or not exists(select 1 from auth.users where id=p_actor) then raise exception 'Unauthenticated'; end if;
+ if p_actor is null or not chich_private.user_exists(p_actor) then raise exception 'Unauthenticated'; end if;
  insert into public.cd_profiles(id) values(p_actor) on conflict do nothing;
  insert into chich_private.accounts(user_id) values(p_actor) on conflict do nothing;
  select is_admin into admin from chich_private.accounts where user_id=p_actor and not suspended;
@@ -185,11 +191,12 @@ begin
   return '{}';
  elsif p_action='profile_save' then
   perform chich_private.throttle(p_actor,'profile',20,60);
-  if length(trim(p_data->>'name')) not between 2 and 40 or (p_data->>'age')::integer not between 18 and 80 or length(trim(p_data->>'bio'))<20 then raise exception 'Điền tên, tuổi từ 18–80 và giới thiệu ít nhất 20 ký tự.'; end if;
+  if coalesce(length(trim(p_data->>'name')),0) not between 2 and 40 or coalesce(p_data->>'age','') !~ '^\d{1,3}$' or (p_data->>'age')::integer not between 18 and 80 or coalesce(length(trim(p_data->>'bio')),0) not between 20 and 400 then raise exception 'Điền tên 2–40 ký tự, tuổi từ 18–80 và giới thiệu 20–400 ký tự.'; end if;
+  if greatest(length(coalesce(p_data->>'city','')),length(coalesce(p_data->>'occupation','')),length(coalesce(p_data->>'bodyType','')),length(coalesce(p_data->>'lifestyle','')),length(coalesce(p_data->>'training','')),length(coalesce(p_data->>'intent','')))>80 then raise exception 'Thông tin hồ sơ quá dài.'; end if;
   update public.cd_profiles set name=trim(p_data->>'name'),age=(p_data->>'age')::integer,city=coalesce(p_data->>'city',''),occupation=coalesce(p_data->>'occupation',''),body_type=coalesce(p_data->>'bodyType',''),lifestyle=coalesce(p_data->>'lifestyle',''),training=coalesce(p_data->>'training',''),intent=coalesce(p_data->>'intent',''),bio=trim(p_data->>'bio'),updated_at=now() where id=p_actor returning * into p;
   return chich_private.profile_json(p);
  elsif p_action='visibility' then
-  update public.cd_profiles set visible=(p_data->>'visible')::boolean where id=p_actor;
+  update public.cd_profiles set visible=coalesce((p_data->>'visible')::boolean,visible) where id=p_actor;
   return '{}';
  elsif p_action='location_off' then
   delete from chich_private.locations where user_id=p_actor; return '{}';
@@ -233,9 +240,10 @@ begin
   k=p_data->>'kind';v_purpose=coalesce(p_data->>'purpose','profile');
   if v_purpose='hero' and not admin then raise exception 'Forbidden'; end if;
   if v_purpose='hero' and k<>'image' then raise exception 'Hero phải là ảnh.'; end if;
+  if k is null or k not in ('image','video') or v_purpose not in ('profile','hero') or coalesce(p_data->>'bytes','') !~ '^\d{1,9}$' then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
+  if (p_data->>'bytes')::int<1 or (k='image' and ((p_data->>'bytes')::int>8388608 or coalesce(p_data->>'mime','') not in ('image/jpeg','image/png','image/webp'))) or (k='video' and ((p_data->>'bytes')::int>20971520 or coalesce(p_data->>'mime','') not in ('video/mp4','video/webm'))) then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
   select count(*) into n from public.cd_media where user_id=p_actor and kind=k and cd_media.purpose=v_purpose and status<>'deleting';
   if n>=(case when v_purpose='hero' then 3 when k='image' then 10 else 2 end) then raise exception 'Đã đạt giới hạn ảnh hoặc video.'; end if;
-  if (k='image' and ((p_data->>'bytes')::int>8388608 or p_data->>'mime' not in ('image/jpeg','image/png','image/webp'))) or (k='video' and p_data->>'mime' not in ('video/mp4','video/webm')) then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
   media_id=gen_random_uuid();
   insert into public.cd_media(id,user_id,kind,purpose,mime,bytes,object_key,position) values(media_id,p_actor,k,v_purpose,p_data->>'mime',(p_data->>'bytes')::int,p_actor::text||'/'||media_id::text,n) returning * into m;
   return to_jsonb(m);
@@ -260,7 +268,7 @@ begin
    update public.cd_media set position=position+1 where user_id=p_actor and purpose='profile';
    update public.cd_media set position=0 where id=media_id;
   end if;
-  if p_data ? 'caption' then update public.cd_media set caption=p_data->>'caption' where id=media_id; end if;
+  if p_data ? 'caption' then update public.cd_media set caption=left(coalesce(p_data->>'caption',''),120) where id=media_id; end if;
   return '{}';
  elsif p_action='media_file' then
   select * into m from public.cd_media where id=(p_data->>'id')::uuid and status='ready';
@@ -269,7 +277,7 @@ begin
   if not admin then raise exception 'Forbidden'; end if;
   select * into m from public.cd_media where id=(p_data->>'id')::uuid and purpose='hero' and kind='image' and status='ready';
   if m.id is null then raise exception 'Ảnh hero chưa sẵn sàng.'; end if;
-  update public.cd_settings set hero_media_id=m.id,hero_alt=coalesce(p_data->>'alt','Sức hút từ những điều đời thường') where id;
+  update public.cd_settings set hero_media_id=m.id,hero_alt=left(coalesce(nullif(trim(p_data->>'alt'),''),'Sức hút từ những điều đời thường'),160) where id;
   update public.cd_media set status='deleting' where purpose='hero' and id<>m.id;
   return '{}';
  elsif p_action in ('like','block','unblock','report','send') then
@@ -284,9 +292,11 @@ begin
    insert into public.cd_blocks values(p_actor,target,now()) on conflict do nothing;
    delete from public.cd_likes where (user_id=p_actor and target_id=target) or (user_id=target and target_id=p_actor);
   elsif p_action='report' then
-   insert into public.cd_reports(reporter_id,target_id,reason,note) values(p_actor,target,p_data->>'reason',coalesce(p_data->>'note',''));
+   if coalesce(length(trim(p_data->>'reason')),0) not between 1 and 100 then raise exception 'Chọn lý do báo cáo.'; end if;
+   insert into public.cd_reports(reporter_id,target_id,reason,note) values(p_actor,target,trim(p_data->>'reason'),left(coalesce(p_data->>'note',''),500));
   else
    if not chich_private.complete(p) then raise exception 'Hãy hoàn thiện hồ sơ trước khi gửi lời chào.';end if;
+   if coalesce(length(trim(p_data->>'text')),0) not between 1 and 1000 then raise exception 'Tin nhắn cần từ 1 đến 1000 ký tự.';end if;
    insert into public.cd_messages(sender_id,recipient_id,body) values(p_actor,target,trim(p_data->>'text'));
   end if; return '{}';
  elsif p_action='liked' then
@@ -310,6 +320,7 @@ begin
  raise exception 'Unknown action';
 end $$;
 revoke all on all functions in schema chich_private from public,anon,authenticated;
+revoke all on function chich_private.user_exists(uuid) from public,anon,authenticated;
 grant execute on all functions in schema chich_private to service_role;
 revoke all on function public.cd_api(uuid,text,jsonb) from public,anon,authenticated;
 grant execute on function public.cd_api(uuid,text,jsonb) to service_role;

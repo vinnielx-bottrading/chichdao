@@ -8,7 +8,7 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  const db=new PGlite();
  try{
  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
- create schema auth; create table auth.users(id uuid primary key);grant usage on schema auth to service_role;grant select on auth.users to service_role;
+ create schema auth; create table auth.users(id uuid primary key);grant usage on schema auth to service_role;
  insert into auth.users values ('${uid}'),('${other}'),('${third}');`);
  await db.exec(await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8'));
  const rpc=async(actor,action,data={})=>(await db.query('select public.cd_api($1,$2,$3::jsonb) as value',[actor,action,JSON.stringify(data)])).rows[0].value;
@@ -47,6 +47,9 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  assert.equal(JSON.stringify(nearby).includes('105.'),false);
  assert.equal('lat' in nearby[0],false);
  await assert.rejects(()=>rpc(uid,'location',{lat:22,lon:105}),/quá nhanh/);
+ await assert.rejects(()=>rpc(uid,'send',{id:other,text:'   '}),/1 đến 1000/);
+ await assert.rejects(()=>rpc(uid,'profile_save',{name:'A'}),/18–80/);
+ await assert.rejects(()=>rpc(uid,'reserve_media',{kind:'video',bytes:20971521,mime:'video/mp4'}),/không hợp lệ/);
  await rpc(uid,'send',{id:other,text:'Xin chào'});
  assert.equal((await rpc(other,'messages',{id:uid})).length,1);
  assert.equal((await rpc(third,'messages',{id:uid})).length,0);
