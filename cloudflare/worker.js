@@ -282,7 +282,7 @@ function guessServiceRegion(url, headers) {
 // worker/index.js
 var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 var EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
-var userActions = ["me", "session", "logout", "accept_adult", "profile_save", "visibility", "location", "location_off", "discover", "profile", "edit_media", "like", "block", "unblock", "report", "send", "liked", "blocked", "contacts", "messages"];
+var userActions = ["me", "session", "logout", "app_installed", "accept_adult", "profile_save", "visibility", "location", "location_off", "discover", "profile", "edit_media", "like", "block", "unblock", "report", "send", "liked", "blocked", "contacts", "messages"];
 var adminActions = ["admin_stats", "admin_users", "admin_user", "admin_conversations", "admin_messages", "admin_media", "admin_activity", "admin_suspend", "admin_audit", "admin_hero", "admin_reports", "admin_resolve"];
 var actions = /* @__PURE__ */ new Set([...userActions, ...adminActions]);
 var enc = new TextEncoder();
@@ -295,13 +295,17 @@ var HttpError = class extends Error {
 function allowedOrigin(origin, env) {
   return (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).includes(origin);
 }
+var SUPABASE_VARS = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+var APP_VARS = ["ALLOWED_ORIGINS", "MEDIA_SIGNING_SECRET"];
+var B2_VARS = ["B2_BUCKET", "B2_REGION", "B2_KEY_ID", "B2_APPLICATION_KEY"];
 function validConfig(env) {
-  return ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY", "MEDIA_SIGNING_SECRET", "ALLOWED_ORIGINS"].every((k) => env[k]);
+  return [...SUPABASE_VARS, ...APP_VARS].every((k) => env[k]);
 }
 function storageMode(env) {
-  if (env.MEDIA_BUCKET && typeof env.MEDIA_BUCKET.put === "function") return "r2";
-  if (["B2_ENDPOINT", "B2_BUCKET", "B2_REGION", "B2_KEY_ID", "B2_APPLICATION_KEY"].every((k) => env[k])) return "b2";
-  return "";
+  return B2_VARS.every((k) => env[k]) ? "b2" : "";
+}
+function b2Endpoint(env) {
+  return (env.B2_ENDPOINT || `https://s3.${env.B2_REGION}.backblazeb2.com`).replace(/\/+$/, "");
 }
 async function boundedBody(request, max) {
   const declared = Number(request.headers.get("content-length"));
@@ -373,7 +377,7 @@ async function rpc(env, actor2, action, data = {}) {
 async function actor(req, env) {
   const token = req.headers.get("authorization");
   if (!token?.startsWith("Bearer ")) throw new HttpError(401, "Vui l\xF2ng \u0111\u0103ng nh\u1EADp.");
-  const r = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, { headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY, authorization: token } });
+  const r = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: token } });
   if (!r.ok) throw new HttpError(401, "Phi\xEAn \u0111\u0103ng nh\u1EADp h\u1EBFt h\u1EA1n. Vui l\xF2ng \u0111\u0103ng nh\u1EADp l\u1EA1i.");
   const user = await r.json();
   if (!UUID.test(user.id) || user.is_anonymous) throw new HttpError(401, "Vui l\xF2ng \u0111\u0103ng nh\u1EADp.");
@@ -403,7 +407,7 @@ async function hydrate(data, viewer, origin, env) {
   return out;
 }
 function b2URL(env, key) {
-  const base = new URL(env.B2_ENDPOINT);
+  const base = new URL(b2Endpoint(env));
   if (base.protocol !== "https:" || !base.hostname.endsWith(".backblazeb2.com")) throw new HttpError(503, "Kho \u1EA3nh ch\u01B0a s\u1EB5n s\xE0ng.");
   return `${base.origin}/${encodeURIComponent(env.B2_BUCKET)}/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
@@ -417,38 +421,21 @@ function requireStorage(env) {
   return mode;
 }
 async function putObject(env, key, bytes, mime) {
-  if (requireStorage(env) === "r2") {
-    await env.MEDIA_BUCKET.put(key, bytes, { httpMetadata: { contentType: mime } });
-    return;
-  }
+  requireStorage(env);
   const r = await b2(env, key, "PUT", bytes, { "content-type": mime, "x-amz-server-side-encryption": "AES256" });
   if (!r.ok) throw new HttpError(502, "Ch\u01B0a t\u1EA3i \u0111\u01B0\u1EE3c file. Vui l\xF2ng th\u1EED l\u1EA1i.");
 }
 async function deleteObject(env, m) {
-  const mode = storageMode(env);
-  if (mode === "r2") await env.MEDIA_BUCKET.delete(m.object_key);
-  else if (mode === "b2") {
-    const r = await b2(env, m.object_key, "DELETE");
-    if (!r.ok && r.status !== 404) throw new HttpError(502, "\u0110ang ch\u1EDD x\xF3a file kh\u1ECFi kho \u1EA3nh. H\u1EC7 th\u1ED1ng s\u1EBD th\u1EED l\u1EA1i.");
-  } else return;
+  if (!storageMode(env)) return;
+  const r = await b2(env, m.object_key, "DELETE");
+  if (!r.ok && r.status !== 404) throw new HttpError(502, "\u0110ang ch\u1EDD x\xF3a file kh\u1ECFi kho \u1EA3nh. H\u1EC7 th\u1ED1ng s\u1EBD th\u1EED l\u1EA1i.");
   await rpc(env, null, "cleanup_done", { id: m.id });
 }
 async function readFile(req, env, media) {
   const range = req.headers.get("range");
   if (range && !/^bytes=\d*-\d*$/.test(range)) throw new HttpError(416, "Range kh\xF4ng h\u1EE3p l\u1EC7.");
   const headers = new Headers({ "content-type": media.mime, "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-disposition": "inline", "accept-ranges": "bytes" });
-  if (requireStorage(env) === "r2") {
-    const obj = await env.MEDIA_BUCKET.get(media.object_key, range ? { range: req.headers } : void 0);
-    if (!obj) throw new HttpError(404, "Kh\xF4ng t\xECm th\u1EA5y \u1EA3nh/video.");
-    if (range && obj.range) {
-      const off = obj.range.offset ?? 0, len = obj.range.length ?? obj.size - off;
-      headers.set("content-range", `bytes ${off}-${off + len - 1}/${obj.size}`);
-      headers.set("content-length", String(len));
-      return new Response(obj.body, { status: 206, headers });
-    }
-    headers.set("content-length", String(obj.size));
-    return new Response(obj.body, { status: 200, headers });
-  }
+  requireStorage(env);
   const upstream = await b2(env, media.object_key, "GET", void 0, range ? { range } : {});
   if (!upstream.ok) throw new HttpError(upstream.status === 416 ? 416 : 404, "Kh\xF4ng t\xECm th\u1EA5y \u1EA3nh/video.");
   for (const key of ["content-length", "content-range"]) if (upstream.headers.has(key)) headers.set(key, upstream.headers.get(key));
@@ -589,7 +576,11 @@ var index_default = {
   }
 };
 export {
+  APP_VARS,
+  B2_VARS,
+  SUPABASE_VARS,
   allowedOrigin,
+  b2Endpoint,
   boundedBody,
   index_default as default,
   deviceLabel,

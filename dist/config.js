@@ -1,6 +1,6 @@
-// Public identifiers only. Never place service-role, Google or B2 secrets here.
+// Public values only (safe in the browser). Secrets live in Cloudflare Worker settings.
 window.CHICH_CONFIG = {
-  supabaseUrl: "https://oignkueulvvdfhgcvguv.supabase.co",
-  supabaseKey: "sb_publishable_fPydS416joWqg53YBGFFsQ_CtbiMCEh",
-  apiUrl: "" // Điền URL Cloudflare Worker sau khi deploy, không có dấu / cuối
+  supabaseUrl: "https://oignkueulvvdfhgcvguv.supabase.co",          // Supabase Auth: đăng nhập Google/email
+  supabaseKey: "sb_publishable_fPydS416joWqg53YBGFFsQ_CtbiMCEh",     // khóa công khai; database đã khóa với trình duyệt
+  apiUrl: ""                                                         // URL Cloudflare Worker, VD https://chich-dao-api.<tài-khoản>.workers.dev (không / cuối)
 };

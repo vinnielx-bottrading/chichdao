@@ -4,7 +4,8 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#101d2d"><meta name="description" content="CHI.CH DAO. — Cùng gu hình thể. Hợp gu hẹn hò. Không gian hẹn hò nam–nam 18+ cho những người cùng gu hình thể và lối sống.">
   <title>CHI.CH DAO. — Cùng gu, cùng tần số</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="CHI.CH DAO."><link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Đến nội dung</a>
@@ -13,10 +14,11 @@
     <div class="brand-caption">CÙNG GU. CÙNG TẦN SỐ.</div>
     <nav aria-label="Điều hướng chính" id="nav"></nav>
     <div class="side-note"><span class="eyebrow">MORE THAN MUSCLE</span><h3>Hình thể thu hút.<br>Tính cách giữ chân.</h3><p>Một kết nối tốt bắt đầu từ sự tôn trọng.</p><button class="text-button" data-action="safety">Hẹn hò an tâm <span>↗</span></button></div>
+    <button class="install-app install-side" data-action="install" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg><span><b>Cài ứng dụng</b><small>Mở nhanh từ màn hình chính</small></span></button>
     <div class="side-bottom"><span class="pill">18+</span><span>Không gian dành cho nam giới</span></div>
     <button class="user-mini" data-nav="profile"><span class="avatar-letter">B</span><span><b>Hồ sơ của bạn</b><small>Thiết lập gu kết nối</small></span><span>↗</span></button>
   </aside>
-  <div class="mobile-top"><a href="#discover" aria-label="CHI.CH DAO."><img src="assets/logo.png" alt="CHI.CH DAO."></a><span class="pill">18+</span></div>
+  <div class="mobile-top"><a href="#discover" aria-label="CHI.CH DAO."><img src="assets/logo.png" alt="CHI.CH DAO."></a><span class="mobile-top-right"><button class="install-app install-mini" data-action="install" hidden aria-label="Cài ứng dụng"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Cài app</button><span class="pill">18+</span></span></div>
   <main id="main" tabindex="-1">
     <header class="topbar"><div><span class="small-brand">THE CONNECTION CLUB</span><span class="top-divider"></span><span class="muted">Dành cho những kết nối có gu</span></div><button class="top-profile" data-nav="profile" aria-label="Mở hồ sơ của bạn"><span class="avatar-letter small">B</span></button></header>
     <div id="page"></div>
@@ -27,7 +29,7 @@
   <dialog id="lightbox" aria-label="Xem album ảnh"><div id="lightbox-content"></div></dialog>
   <dialog id="age-gate" aria-label="Chào mừng và đăng nhập">
     <div class="onboarding-window"><div class="onboarding-track" id="onboarding-track">
-      <section class="age-content onboarding-step" id="welcome-step" aria-labelledby="age-title">
+      <section class="age-content onboarding-step is-active" id="welcome-step" aria-labelledby="age-title">
         <img src="assets/logo.png" alt="CHI.CH DAO."><span class="eyebrow">MỘT KHÔNG GIAN CÙNG GU</span>
         <h1 id="age-title">Kết nối bắt đầu<br>từ sự tôn trọng.</h1>
         <p>Không gian hẹn hò nam–nam dành cho người <strong>từ 18 tuổi trở lên</strong>. Cùng gu hình thể, hợp gu hẹn hò.</p>

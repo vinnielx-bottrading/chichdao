@@ -30,51 +30,9 @@ Trong Supabase Authentication → URL Configuration:
 - Client dùng PKCE, Supabase SDK xử lý `?code=...` khi quay lại.
 - Popup trượt ở trong site; bước xác thực Google chuyển hướng tới Google rồi quay về, không dùng iframe đăng nhập.
 
-## 3. Backblaze B2
+## 3–4. Backblaze B2 và Cloudflare Worker
 
-1. Tạo bucket **private**, lấy endpoint S3, region và bucket name.
-2. Tạo application key giới hạn đúng bucket, có quyền đọc/ghi/xóa file cần thiết. Không dùng master key.
-3. Worker ký các request S3 bằng `aws4fetch`; frontend không nhận B2 credentials và không tải trực tiếp tới B2.
-4. Bật mã hóa SSE-B2 (Worker gửi header AES256 khi PUT).
-5. Đặt lifecycle cho phiên bản cũ/hidden file. S3 DELETE trên B2 có thể tạo delete marker; cần lifecycle để xóa phiên bản cũ vật lý theo thời hạn bạn công bố. Không mô tả xóa là tức thì ở mọi bản sao/backup.
-6. Worker kiểm tra MIME magic bytes, dung lượng thực, sở hữu slot và trạng thái. Nếu cần kiểm duyệt tự động, bổ sung pipeline riêng trước khi cho media chuyển ready; hiện chưa tích hợp dịch vụ quét ảnh/video.
-
-## 4. Cloudflare Worker
-
-> Hướng dẫn rút gọn và bảng biến đầy đủ: `cloudflare/HUONG-DAN.md`. Worker chạy được khi chưa có kho ảnh; R2 (binding `MEDIA_BUCKET`) hoặc B2 cấu hình sau.
-
-Cài Wrangler theo tài liệu Cloudflare hiện hành, kiểm tra `wrangler --help` và đăng nhập tài khoản đúng. Không ghi API token vào git.
-
-Từ root dự án:
-
-```sh
-npm ci
-npm run build
-npx wrangler deploy --config cloudflare/wrangler.toml
-```
-
-Điền các biến qua Cloudflare Dashboard → Worker → Settings → Variables and Secrets:
-
-| Tên | Loại | Nội dung |
-| --- | --- | --- |
-| SUPABASE_URL | Variable | URL dự án đích |
-| SUPABASE_PUBLISHABLE_KEY | Variable | Publishable key |
-| SUPABASE_SERVICE_ROLE_KEY | Secret | Legacy service-role JWT key, server only |
-| B2_ENDPOINT | Variable | `https://s3.REGION.backblazeb2.com` |
-| B2_REGION | Variable | Region đúng bucket |
-| B2_BUCKET | Variable | Tên bucket private |
-| B2_KEY_ID | Secret | Application key ID giới hạn bucket |
-| B2_APPLICATION_KEY | Secret | Application key |
-| MEDIA_SIGNING_SECRET | Secret | Chuỗi ngẫu nhiên tối thiểu 32 byte; giữ ổn định giữa các deploy |
-| ALLOWED_ORIGINS | Variable | Danh sách origin chính xác, phân cách dấu phẩy |
-
-Không gửi secret trong chat hoặc đặt trong `dist/config.js`. Dùng dashboard/secret manager của tài khoản. `.dev.vars.example` chỉ để tham khảo; `.dev.vars` đã được gitignore.
-
-- `GET /health` trả `ready:true` khi đủ tên biến, **không phải** health check kết nối hoàn chỉnh.
-- Cron mỗi 30 phút dọn slot quá 1 giờ, file đang xóa và vị trí hết hạn.
-- Cấu hình Cloudflare rate limiting/WAF cho `/api`, `/uploads*` theo tài khoản/gói; DB còn có hạn mức thao tác theo user cho khám phá, vị trí, tin nhắn, báo cáo, upload.
-- Không bật logging toàn bộ URL/query/body vì ảnh/video dùng signed URLs.
-- Có thể gán domain riêng, ví dụ `api.<domain-cua-ban>`. CORS chỉ cho origin frontend.
+Xem `cloudflare/HUONG-DAN.md`: cấu trúc lưu trữ trên B2, tạo bucket/Application Key, deploy Worker và bảng 8 biến (nhóm Supabase · Backblaze B2 · Ứng dụng).
 
 ## 5. Nối frontend
 

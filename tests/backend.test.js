@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import worker,{boundedBody,sniffMime,signMedia,verifyMedia,allowedOrigin,hydrate,storageMode,deviceLabel} from '../worker/index.js';
+import worker,{boundedBody,sniffMime,signMedia,verifyMedia,allowedOrigin,hydrate,storageMode,deviceLabel,b2Endpoint} from '../worker/index.js';
 const uid='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',third='33333333-3333-4333-8333-333333333333',adminId='44444444-4444-4444-8444-444444444444';
 test('database authorization, album limits, nearby privacy and ownership',async()=>{
  const db=new PGlite();
@@ -32,6 +32,7 @@ test('database authorization, album limits, nearby privacy and ownership',async(
   await rpc(id,'claim_media',{id:m.id});await rpc(id,'finish_media',{id:m.id});return m;
  };
  const first=await add(uid);await add(other);await add(third);
+ assert.match(first.object_key,new RegExp(`^users/${uid}/images/${first.id}\\.jpg$`));
  assert.equal((await rpc(uid,'me')).complete,true);
  for(let i=1;i<10;i++)await add(uid);
  await assert.rejects(()=>add(uid),/giới hạn/);
@@ -70,8 +71,10 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  await assert.rejects(()=>rpc(uid,'admin_messages',{a:uid,b:other}),/Forbidden/);
  await rpc(uid,'session',{event:'SIGNED_IN',_geo:{country:'VN',city:'Hanoi',device:'Android · Chrome'}});
  await rpc(uid,'logout',{_geo:{country:'VN',city:'Hanoi'}});
+ assert.equal((await rpc(uid,'me')).appInstalled,false);await rpc(uid,'app_installed',{_geo:{country:'VN'}});assert.equal((await rpc(uid,'me')).appInstalled,true);
+ assert.match((await rpc(uid,'reserve_media',{kind:'video',bytes:15,mime:'video/webm'}).catch(e=>({object_key:e.message}))).object_key,/giới hạn|^users\/.+\/videos\/.+\.webm$/);
  const stats=await rpc(adminId,'admin_stats');
- assert.equal(stats.totals.users,4);assert.equal(stats.totals.messages,1);assert.equal(stats.signups.length,30);
+ assert.equal(stats.totals.users,4);assert.equal(stats.totals.installed,1);assert.equal(stats.totals.messages,1);assert.equal(stats.signups.length,30);
  assert.ok(stats.geoCity.some(x=>x.label==='Hanoi'));
  const users=await rpc(adminId,'admin_users',{query:'b@example'});
  assert.equal(users.length,1);assert.equal(users[0].email,'b@example.test');
@@ -91,7 +94,7 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  const audit=await rpc(adminId,'admin_audit');
  assert.ok(['view_user','view_chat','suspend'].every(a=>audit.some(x=>x.action===a)));
  const hero=await rpc(adminId,'reserve_media',{kind:'image',purpose:'hero',mime:'image/jpeg',bytes:15});
- await rpc(adminId,'claim_media',{id:hero.id});await rpc(adminId,'finish_media',{id:hero.id});await rpc(adminId,'admin_hero',{id:hero.id,alt:'Vườn cây'});
+ assert.equal(hero.object_key,`site/hero/${hero.id}.jpg`);await rpc(adminId,'claim_media',{id:hero.id});await rpc(adminId,'finish_media',{id:hero.id});await rpc(adminId,'admin_hero',{id:hero.id,alt:'Vườn cây'});
  assert.equal((await rpc(null,'hero')).mediaId,hero.id);
  await assert.rejects(()=>rpc(null,'hero_file',{id:first.id}),/Không tìm/);
  await rpc(uid,'delete_media',{id:first.id});await rpc(null,'cleanup_done',{id:first.id});
@@ -120,9 +123,29 @@ test('worker helpers: nested media signing, optional storage, device label',asyn
  const out=await hydrate({profile:{photos:[{id:uid,kind:'image'}]},media:[{id:other,status:'pending'}]},third,'https://api.test',env);
  assert.match(out.profile.photos[0].src,/^https:\/\/api\.test\/media\//);
  assert.equal(out.media[0].src,undefined);
- assert.equal(storageMode({}),'');assert.equal(storageMode({MEDIA_BUCKET:{put(){}}}),'r2');
+ assert.equal(storageMode({}),'');assert.equal(storageMode({B2_BUCKET:'b',B2_REGION:'us-west-004',B2_KEY_ID:'k',B2_APPLICATION_KEY:'s'}),'b2');assert.equal(b2Endpoint({B2_REGION:'us-west-004'}),'https://s3.us-west-004.backblazeb2.com');
  assert.equal(deviceLabel('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit Version/17 Mobile Safari/604.1'),'iOS · Safari');
- const core={SUPABASE_URL:'x',SUPABASE_PUBLISHABLE_KEY:'x',SUPABASE_SERVICE_ROLE_KEY:'x',MEDIA_SIGNING_SECRET:'x',ALLOWED_ORIGINS:'https://a.test'};
+ const core={SUPABASE_URL:'x',SUPABASE_SERVICE_ROLE_KEY:'x',MEDIA_SIGNING_SECRET:'x',ALLOWED_ORIGINS:'https://a.test'};
  const health=await (await worker.fetch(new Request('https://api.test/health'),core)).json();
  assert.deepEqual(health,{ready:true,storage:'none'});
+});
+test('upload goes to Backblaze B2 with SigV4, SSE and the users/<uid>/images layout',async()=>{
+ const mediaId='55555555-5555-4555-8555-555555555555',key=`users/${uid}/images/${mediaId}.jpg`,jpeg=Uint8Array.from([255,216,255,224,0,0,0,0,0,0,0,0,1,2,3,4]);
+ const env={SUPABASE_URL:'https://db.test',SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x',MEDIA_SIGNING_SECRET:'a-secure-test-secret-32-characters',ALLOWED_ORIGINS:'https://app.test',B2_BUCKET:'chich-media',B2_REGION:'us-west-004',B2_KEY_ID:'kid',B2_APPLICATION_KEY:'secret'};
+ const calls=[];const real=globalThis.fetch;
+ globalThis.fetch=async(input,init={})=>{const req=input instanceof Request?input:new Request(input,init);calls.push(req);
+  if(req.url.endsWith('/auth/v1/user'))return Response.json({id:uid});
+  if(req.url.endsWith('/rest/v1/rpc/cd_api')){const {p_action}=await req.clone().json();return Response.json(p_action==='claim_media'?{id:mediaId,object_key:key,mime:'image/jpeg',bytes:jpeg.length}:{id:mediaId});}
+  if(req.url.includes('backblazeb2.com'))return new Response(null,{status:200});
+  throw new Error('unexpected '+req.url);};
+ try{
+  const res=await worker.fetch(new Request(`https://api.test/uploads/${mediaId}`,{method:'PUT',headers:{authorization:'Bearer t',origin:'https://app.test','content-type':'image/jpeg'},body:jpeg}),env);
+  assert.equal(res.status,200);
+  const put=calls.find(r=>r.url.includes('backblazeb2.com'));
+  assert.equal(put.url,`https://s3.us-west-004.backblazeb2.com/chich-media/${key}`);
+  assert.match(put.headers.get('authorization'),/^AWS4-HMAC-SHA256 Credential=kid\//);
+  assert.equal(put.headers.get('x-amz-server-side-encryption'),'AES256');
+  const auth=calls.find(r=>r.url.endsWith('/auth/v1/user'));assert.equal(auth.headers.get('apikey'),'sb_secret_x');
+  const rpcCall=calls.find(r=>r.url.endsWith('/rpc/cd_api'));assert.equal(rpcCall.headers.get('authorization'),null);
+ }finally{globalThis.fetch=real;}
 });

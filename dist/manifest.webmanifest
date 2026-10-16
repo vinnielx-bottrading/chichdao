@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "CHI.CH DAO. — Cùng gu, cùng tần số",
+  "short_name": "CHI.CH DAO.",
+  "description": "Không gian hẹn hò nam–nam 18+ cho những người cùng gu hình thể và lối sống.",
+  "lang": "vi",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1421",
+  "theme_color": "#101d2d",
+  "categories": ["social", "lifestyle"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

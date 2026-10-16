@@ -24,6 +24,7 @@ create table public.cd_profiles (
 create table chich_private.accounts (
  user_id uuid primary key references public.cd_profiles(id) on delete cascade,
  is_admin boolean not null default false, suspended boolean not null default false,
+ app_installed_at timestamptz,
  last_seen_at timestamptz, last_country text not null default '', last_city text not null default '', last_device text not null default ''
 );
 -- Single admin, identified by the verified Supabase Auth email (Google or email login).
@@ -246,17 +247,18 @@ begin
    last_country=left(coalesce(p_data->'_geo'->>'country',''),8),last_city=left(coalesce(p_data->'_geo'->>'city',''),80),last_device=left(coalesce(p_data->'_geo'->>'device',''),120)
   where user_id=p_actor and (last_seen_at is null or last_seen_at<now()-interval '2 minutes' or p_action in ('session','logout'));
  end if;
- if p_action in ('session','logout','profile_save','visibility','location','location_off','like','block','unblock','report','send','finish_media','delete_media','accept_adult') then
-  if p_action in ('session','logout') then perform chich_private.throttle(p_actor,'session',30,60); end if;
+ if p_action in ('session','logout','app_installed','profile_save','visibility','location','location_off','like','block','unblock','report','send','finish_media','delete_media','accept_adult') then
+  if p_action in ('session','logout','app_installed') then perform chich_private.throttle(p_actor,'session',30,60); end if;
   insert into chich_private.activity(user_id,event,target_id,country,region,city,device)
   values(p_actor,case when p_action='session' then left(coalesce(nullif(p_data->>'event',''),'session'),40) when p_action='like' and not coalesce((p_data->>'liked')::boolean,false) then 'unlike' else p_action end,
    case when p_action in ('like','block','unblock','report','send') and coalesce(p_data->>'id','') ~* '^[0-9a-f-]{36}$' then (p_data->>'id')::uuid end,
    left(coalesce(p_data->'_geo'->>'country',''),8),left(coalesce(p_data->'_geo'->>'region',''),80),left(coalesce(p_data->'_geo'->>'city',''),80),left(coalesce(p_data->'_geo'->>'device',''),120));
   if p_action='logout' then return '{}'; end if;
+  if p_action='app_installed' then update chich_private.accounts set app_installed_at=coalesce(app_installed_at,now()) where user_id=p_actor; return jsonb_build_object('appInstalled',true); end if;
  end if;
 
  if p_action in ('me','session') then
-  return chich_private.profile_json(p)||jsonb_build_object('admin',admin,'nearbyEnabled',exists(select 1 from chich_private.locations where user_id=p_actor and updated_at>now()-interval '24 hours'),
+  return chich_private.profile_json(p)||jsonb_build_object('admin',admin,'appInstalled',exists(select 1 from chich_private.accounts where user_id=p_actor and app_installed_at is not null),'nearbyEnabled',exists(select 1 from chich_private.locations where user_id=p_actor and updated_at>now()-interval '24 hours'),
   'likes',coalesce((select jsonb_agg(target_id) from public.cd_likes where user_id=p_actor),'[]'));
  elsif p_action='accept_adult' then
   update public.cd_profiles set adult_accepted_at=coalesce(adult_accepted_at,now()) where id=p_actor;
@@ -317,7 +319,9 @@ begin
   select count(*) into n from public.cd_media where user_id=p_actor and kind=k and cd_media.purpose=v_purpose and status<>'deleting';
   if n>=(case when v_purpose='hero' then 3 when k='image' then 10 else 2 end) then raise exception 'Đã đạt giới hạn ảnh hoặc video.'; end if;
   media_id=gen_random_uuid();
-  insert into public.cd_media(id,user_id,kind,purpose,mime,bytes,object_key,position) values(media_id,p_actor,k,v_purpose,p_data->>'mime',(p_data->>'bytes')::int,p_actor::text||'/'||media_id::text,n) returning * into m;
+  insert into public.cd_media(id,user_id,kind,purpose,mime,bytes,object_key,position) values(media_id,p_actor,k,v_purpose,p_data->>'mime',(p_data->>'bytes')::int,
+   -- B2 layout: site/hero/<id>.<ext> | users/<uid>/images/<id>.<ext> | users/<uid>/videos/<id>.<ext>
+   case when v_purpose='hero' then 'site/hero/' else 'users/'||p_actor::text||case when k='image' then '/images/' else '/videos/' end end||media_id::text||'.'||case p_data->>'mime' when 'image/jpeg' then 'jpg' when 'image/png' then 'png' when 'image/webp' then 'webp' when 'video/mp4' then 'mp4' else 'webm' end,n) returning * into m;
   return to_jsonb(m);
  elsif p_action='claim_media' then
   update public.cd_media set status='uploading' where id=(p_data->>'id')::uuid and user_id=p_actor and status='pending' and created_at>now()-interval '15 minutes' returning * into m;
@@ -367,7 +371,8 @@ begin
      'likes',(select count(*) from public.cd_likes),
      'blocks',(select count(*) from public.cd_blocks),
      'openReports',(select count(*) from public.cd_reports where not resolved),
-     'nearby',(select count(*) from chich_private.locations where updated_at>now()-interval '24 hours')),
+     'nearby',(select count(*) from chich_private.locations where updated_at>now()-interval '24 hours'),
+     'installed',(select count(*) from chich_private.accounts where app_installed_at is not null)),
     'signups',chich_private.daily('signup'),
     'active',chich_private.daily('active'),
     'messagesDaily',chich_private.daily('message'),
@@ -382,7 +387,7 @@ begin
    return coalesce((select jsonb_agg(x.row order by x.created_at desc) from (
     select u.created_at,jsonb_build_object('id',u.id,'email',u.email,'provider',u.provider,'createdAt',u.created_at,'lastSignIn',u.last_sign_in_at,
      'name',coalesce(q.name,''),'age',q.age,'city',coalesce(q.city,''),'intent',coalesce(q.intent,''),'complete',coalesce(chich_private.complete(q),false),'visible',coalesce(q.visible,false),
-     'suspended',coalesce(a.suspended,false),'lastSeen',a.last_seen_at,'lastCity',coalesce(a.last_city,''),'lastCountry',coalesce(a.last_country,''),
+     'suspended',coalesce(a.suspended,false),'appInstalled',a.app_installed_at is not null,'lastSeen',a.last_seen_at,'lastCity',coalesce(a.last_city,''),'lastCountry',coalesce(a.last_country,''),
      'images',(select count(*) from public.cd_media md where md.user_id=u.id and md.kind='image' and md.purpose='profile' and md.status='ready'),
      'videos',(select count(*) from public.cd_media md where md.user_id=u.id and md.kind='video' and md.purpose='profile' and md.status='ready'),
      'sent',(select count(*) from public.cd_messages mm where mm.sender_id=u.id),

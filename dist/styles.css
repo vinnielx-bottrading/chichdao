@@ -14,10 +14,10 @@ dialog{border:1px solid #3a4c61;border-radius:20px;background:#142235;color:var(
 /* Account, media and administration */
 #age-gate {max-width:660px;width:calc(100% - 32px);padding:0;overflow-x:hidden}
 .onboarding-window {overflow:hidden;width:100%}
-.onboarding-track {display:flex;width:200%;align-items:flex-start;transition:transform .42s cubic-bezier(.22,.75,.2,1)}
-.onboarding-track.at-login {transform:translateX(-50%)}
-.onboarding-step {flex:0 0 50%;width:50%;box-sizing:border-box}
-.onboarding-step[inert] {visibility:hidden}
+
+
+
+
 .google-button {background:#fff;color:#182638;width:100%;justify-content:center;gap:15px;margin:24px 0 12px}
 .google-button span {font-family:Arial,sans-serif;font-size:24px;font-weight:700;color:#4285f4}
 .auth-links {display:flex;gap:20px;margin-top:24px;font-size:12px;color:var(--muted)}
@@ -38,3 +38,19 @@ dialog{border:1px solid #3a4c61;border-radius:20px;background:#142235;color:var(
 @media(max-width:640px){.onboarding-step {padding:28px 22px}.nearby-panel .button,.nearby-panel select {width:100%}.mobile-nav {overflow-x:auto}.report-item {overflow-wrap:anywhere}}
 
 .email-login{margin-top:14px;text-align:left;width:100%}.email-login summary{cursor:pointer;color:var(--muted);font-size:12px;text-align:center}.email-login form{display:grid;gap:8px;margin-top:12px}.email-login label{font-size:11px;color:var(--muted)}.email-login input{background:var(--soft);border:1px solid #354356;border-radius:10px;padding:11px 12px;color:var(--text)}.email-login .button{margin-top:6px}
+
+/* Onboarding: steps toggle by class (works without `inert` support, e.g. older iOS / in-app browsers) */
+.onboarding-track{display:block;width:100%}.onboarding-step{display:none;width:100%;box-sizing:border-box}.onboarding-step.is-active{display:block;animation:stepIn .38s cubic-bezier(.22,.75,.2,1)}.onboarding-track.at-login .onboarding-step.is-active{animation-name:stepInRight}
+@keyframes stepIn{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}@keyframes stepInRight{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.onboarding-step.is-active{animation:none}}
+
+/* Install app (PWA) */
+.install-app[hidden]{display:none!important}
+.install-side{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--soft);border:1px solid #354356;border-radius:12px;padding:12px 13px;margin:0 0 14px;color:var(--text)}
+.install-side:hover{border-color:var(--orange)}.install-side .icon{color:var(--orange)}
+.install-side b{display:block;font-size:12px}.install-side small{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.mobile-top-right{display:flex;align-items:center;gap:8px}
+.install-mini{display:inline-flex;align-items:center;gap:6px;background:var(--orange);color:#102035;border-radius:8px;padding:7px 10px;font-size:11px;font-weight:700}
+.install-mini .icon{width:16px;height:16px}
+.ios-steps{display:grid;gap:12px;margin-top:6px;padding-left:20px}.ios-steps li{line-height:1.7}.ios-steps b{color:var(--orange)}
+.auth-links{display:flex;justify-content:center;gap:18px;margin-top:14px}.auth-links button{background:none;color:var(--muted);font-size:11px;text-decoration:underline;text-underline-offset:3px;padding:4px 0}

@@ -9,7 +9,7 @@ const dt=s=>s?new Date(s).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',
 const ago=s=>{if(!s)return '—';const m=Math.round((Date.now()-new Date(s))/60000);if(m<1)return 'vừa xong';if(m<60)return `${m} phút trước`;const h=Math.round(m/60);if(h<48)return `${h} giờ trước`;return `${Math.round(h/24)} ngày trước`;};
 const bytes=b=>b>1048576?`${(b/1048576).toFixed(1)} MB`:`${Math.round((b||0)/1024)} KB`;
 const place=(o)=>[o.city||o.lastCity||o.last_city,o.country||o.lastCountry||o.last_country].filter(Boolean).join(', ')||'—';
-const EVENTS={SIGNED_IN:'Đăng nhập',INITIAL_SESSION:'Mở ứng dụng',session:'Mở ứng dụng',USER_UPDATED:'Cập nhật tài khoản',logout:'Đăng xuất',accept_adult:'Xác nhận 18+',profile_save:'Lưu hồ sơ',visibility:'Đổi hiển thị',location:'Bật vị trí',location_off:'Tắt vị trí',like:'Thích',unlike:'Bỏ thích',block:'Chặn',unblock:'Bỏ chặn',report:'Báo cáo',send:'Gửi tin nhắn',finish_media:'Tải ảnh/video',delete_media:'Xóa ảnh/video'};
+const EVENTS={SIGNED_IN:'Đăng nhập',INITIAL_SESSION:'Mở ứng dụng',session:'Mở ứng dụng',USER_UPDATED:'Cập nhật tài khoản',logout:'Đăng xuất',accept_adult:'Xác nhận 18+',profile_save:'Lưu hồ sơ',visibility:'Đổi hiển thị',location:'Bật vị trí',location_off:'Tắt vị trí',like:'Thích',unlike:'Bỏ thích',block:'Chặn',unblock:'Bỏ chặn',report:'Báo cáo',send:'Gửi tin nhắn',finish_media:'Tải ảnh/video',app_installed:'Cài ứng dụng',delete_media:'Xóa ảnh/video'};
 const AUDIT={view_user:'Xem hồ sơ',view_chat:'Đọc hội thoại',suspend:'Khóa/mở khóa',delete_media:'Xóa media',resolve_report:'Xử lý báo cáo',create_user:'Tạo người dùng',update_auth:'Đổi email/mật khẩu'};
 const ev=e=>EVENTS[e]||e;
 const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['audit','Nhật ký admin'],['settings','Cài đặt']];
@@ -79,7 +79,7 @@ async function overview(){
  const AGE=['18–24','25–29','30–34','35–39','40–49','50+','Chưa có'];stats.age=[...(stats.age||[])].sort((x,y)=>AGE.indexOf(x.label)-AGE.indexOf(y.label));
  const k=(label,value,sub='')=>`<div class="kpi"><span>${label}</span><b>${num(value)}</b>${sub?`<small>${sub}</small>`:''}</div>`;
  $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">TỔNG QUAN</span><h1>Bảng điều khiển</h1><p>Số liệu thời gian thực từ cơ sở dữ liệu · 30 ngày gần nhất theo giờ Việt Nam.</p></div><button class="btn" id="refresh">Làm mới</button></div>
- <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}</div>
+ <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}${k('Đã cài app',t.installed)}</div>
  <div class="grid">
   ${chartCard('c-signups','Đăng ký mới theo ngày','Hồ sơ được tạo, 30 ngày',stats.signups)}
   ${chartCard('c-active','Người dùng hoạt động theo ngày','Số tài khoản có hoạt động mỗi ngày',stats.active)}
@@ -121,7 +121,7 @@ async function users(reset){
  }
  const rows=await api('admin_users',{query:s.q,filter:s.filter,offset:s.rows.length});s.rows.push(...rows);s.done=rows.length<50;
  $('#u-body').innerHTML=s.rows.map(u=>`<tr class="click" data-user="${u.id}"><td>${esc(u.email||'—')} ${u.provider?`<span class="tag">${esc(u.provider)}</span>`:''}</td><td>${esc(u.name||'—')}</td><td>${u.age||'—'}</td><td>${esc(u.city||'—')}</td>
-  <td>${u.suspended?'<span class="tag bad">Bị khóa</span>':u.complete?'<span class="tag ok">Hoàn thiện</span>':'<span class="tag">Chưa đủ</span>'}${u.reported?`<span class="tag hot">${u.reported} báo cáo</span>`:''}</td>
+  <td>${u.suspended?'<span class="tag bad">Bị khóa</span>':u.complete?'<span class="tag ok">Hoàn thiện</span>':'<span class="tag">Chưa đủ</span>'}${u.appInstalled?'<span class="tag">Đã cài app</span>':''}${u.reported?`<span class="tag hot">${u.reported} báo cáo</span>`:''}</td>
   <td>${u.images}/${u.videos}</td><td>${num(u.sent)}</td><td>${dt(u.createdAt)}</td><td>${dt(u.lastSignIn)}</td><td>${ago(u.lastSeen)}</td><td>${esc(place(u))}</td></tr>`).join('')||`<tr><td colspan="11">${empty('Không có người dùng phù hợp.')}</td></tr>`;
  $('#u-more').hidden=s.done;
 }
@@ -144,7 +144,7 @@ async function userDetail(id,sub='profile'){
  const body={
   profile:`<dl class="kv"><dt>Tên hiển thị</dt><dd>${esc(p.name||'—')}</dd><dt>Tuổi</dt><dd>${p.age||'—'}</dd><dt>Khu vực</dt><dd>${esc(p.city||'—')}</dd><dt>Mong muốn</dt><dd>${esc(p.intent||'—')}</dd><dt>Nghề nghiệp</dt><dd>${esc(p.occupation||'—')}</dd><dt>Vóc dáng</dt><dd>${esc(p.bodyType||'—')}</dd><dt>Lối sống</dt><dd>${esc(p.lifestyle||'—')}</dd><dt>Cách vận động</dt><dd>${esc(p.training||'—')}</dd><dt>Giới thiệu</dt><dd>${esc(p.bio||'—')}</dd>
    <dt>Xác nhận 18+</dt><dd>${dt(p.adultAcceptedAt)}</dd><dt>Tạo hồ sơ</dt><dd>${dt(p.createdAt)}</dd><dt>Sửa hồ sơ</dt><dd>${dt(p.updatedAt)}</dd><dt>Lượt thích</dt><dd>Đã thích ${num(d.likesGiven)} · được thích ${num(d.likesReceived)}</dd><dt>Chặn</dt><dd>Đã chặn ${num(d.blocksGiven)} · bị chặn bởi ${num(d.blockedBy)}</dd>
-   <dt>Tìm ở gần</dt><dd>${d.nearby?`Đang bật · cập nhật ${dt(d.nearby.updatedAt)}`:'Không bật'}</dd><dt>Truy cập gần nhất</dt><dd>${ago(acc.last_seen_at)} · ${esc(place(acc))} · ${esc(acc.last_device||'—')}</dd></dl>`,
+   <dt>Tìm ở gần</dt><dd>${d.nearby?`Đang bật · cập nhật ${dt(d.nearby.updatedAt)}`:'Không bật'}</dd><dt>Ứng dụng</dt><dd>${acc.app_installed_at?`Đã cài · ${dt(acc.app_installed_at)}`:'Chưa cài'}</dd><dt>Truy cập gần nhất</dt><dd>${ago(acc.last_seen_at)} · ${esc(place(acc))} · ${esc(acc.last_device||'—')}</dd></dl>`,
   media:d.media.length?`<div class="media-grid">${d.media.map(tile).join('')}</div>`:empty('Chưa tải ảnh/video.'),
   activity:activityTable(d.activity,false),
   chats:d.conversations.length?`<div class="chat-layout"><div class="convo-list">${d.conversations.map(c=>`<button class="convo" data-thread="${id}|${c.partner_id}" data-names="${esc(JSON.stringify({[id]:p.name||a.email,[c.partner_id]:c.partner_name||c.partner_email}))}"><b>${esc(c.partner_name||c.partner_email||c.partner_id)}</b><p>${num(c.n)} tin · ${dt(c.last_at)}</p></button>`).join('')}</div><div class="thread" id="d-thread">${empty('Chọn một cuộc trò chuyện.')}</div></div>`:empty('Chưa có cuộc trò chuyện.'),
@@ -222,7 +222,7 @@ async function audit(){
 }
 async function settingsView(){
  let h=null;try{h=await hero();}catch{}
- $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">CÀI ĐẶT</span><h1>Ảnh trang chủ</h1><p>Cần cấu hình kho ảnh (R2 hoặc B2) trên Worker trước khi tải ảnh.</p></div></div>
+ $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">CÀI ĐẶT</span><h1>Ảnh trang chủ</h1><p>Cần cấu hình Backblaze B2 trên Worker trước khi tải ảnh.</p></div></div>
  <section class="card" style="max-width:640px"><img src="${safeURL(h?.src||'assets/long-1.jpg')}" alt="Ảnh hero hiện tại" id="hero-prev" style="border-radius:10px;margin-bottom:14px;max-height:280px;width:100%;object-fit:cover">
  <form id="hero-form" class="stack"><label for="hero-img">Ảnh mới (JPG/PNG/WebP)</label><input id="hero-img" name="image" type="file" accept="image/jpeg,image/png,image/webp" required><label for="hero-alt">Mô tả ảnh</label><input id="hero-alt" name="alt" maxlength="160" value="${esc(h?.alt||'Sức hút từ cuộc sống đời thường')}"><button class="btn primary">Thay ảnh hero</button></form></section>`;
  $('#hero-img').onchange=e=>{const f=e.target.files?.[0];if(f)$('#hero-prev').src=URL.createObjectURL(f);};

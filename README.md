@@ -1,6 +1,6 @@
-# CHI.CH DAO. — v0.4
+# CHI.CH DAO. — v0.5
 
-Ứng dụng hẹn hò nam–nam 18+. Frontend giữ thiết kế navy/cam, backend dùng **Supabase Auth + PostgreSQL**, **Cloudflare Worker**, **Backblaze B2 private bucket**.
+Ứng dụng hẹn hò nam–nam 18+, cài được như app (PWA). Frontend trên **Vercel**; API là **Cloudflare Worker**; **Supabase** làm database (và đăng nhập Google/email); **Backblaze B2** (bucket private) lưu ảnh/video. Hướng dẫn triển khai: `cloudflare/HUONG-DAN.md`.
 
 ## Đưa package này lên GitHub
 

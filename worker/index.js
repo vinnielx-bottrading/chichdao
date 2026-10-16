@@ -2,16 +2,22 @@ import { AwsClient } from 'aws4fetch';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL=/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
-const userActions=['me','session','logout','accept_adult','profile_save','visibility','location','location_off','discover','profile','edit_media','like','block','unblock','report','send','liked','blocked','contacts','messages'];
+const userActions=['me','session','logout','app_installed','accept_adult','profile_save','visibility','location','location_off','discover','profile','edit_media','like','block','unblock','report','send','liked','blocked','contacts','messages'];
 const adminActions=['admin_stats','admin_users','admin_user','admin_conversations','admin_messages','admin_media','admin_activity','admin_suspend','admin_audit','admin_hero','admin_reports','admin_resolve'];
 // admin_delete_media is handled specially (storage delete); admin_audit_add is Worker-only and never client-callable.
 const actions=new Set([...userActions,...adminActions]);
 const enc=new TextEncoder();
 class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
 export function allowedOrigin(origin,env){return (env.ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).includes(origin);}
-// Core API runs without media storage; uploads stay disabled until R2 or B2 is configured.
-export function validConfig(env){return ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_SERVICE_ROLE_KEY','MEDIA_SIGNING_SECRET','ALLOWED_ORIGINS'].every(k=>env[k]);}
-export function storageMode(env){if(env.MEDIA_BUCKET&&typeof env.MEDIA_BUCKET.put==='function')return 'r2';if(['B2_ENDPOINT','B2_BUCKET','B2_REGION','B2_KEY_ID','B2_APPLICATION_KEY'].every(k=>env[k]))return 'b2';return '';}
+// Variables by service:
+//  Supabase (database; also verifies login sessions): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+//  Backblaze B2 (photo/video storage):                B2_BUCKET, B2_REGION, B2_KEY_ID, B2_APPLICATION_KEY [, B2_ENDPOINT]
+//  App:                                               ALLOWED_ORIGINS, MEDIA_SIGNING_SECRET
+// The core API runs before B2 is configured; uploads/media return 503 until it is.
+export const SUPABASE_VARS=['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'],APP_VARS=['ALLOWED_ORIGINS','MEDIA_SIGNING_SECRET'],B2_VARS=['B2_BUCKET','B2_REGION','B2_KEY_ID','B2_APPLICATION_KEY'];
+export function validConfig(env){return [...SUPABASE_VARS,...APP_VARS].every(k=>env[k]);}
+export function storageMode(env){return B2_VARS.every(k=>env[k])?'b2':'';}
+export function b2Endpoint(env){return (env.B2_ENDPOINT||`https://s3.${env.B2_REGION}.backblazeb2.com`).replace(/\/+$/,'');}
 export async function boundedBody(request,max){
  const declared=Number(request.headers.get('content-length'));
  if(declared>max)throw new HttpError(413,'File vượt giới hạn dung lượng.');
@@ -49,7 +55,8 @@ async function rpc(env,actor,action,data={}){
 }
 async function actor(req,env){
  const token=req.headers.get('authorization');if(!token?.startsWith('Bearer '))throw new HttpError(401,'Vui lòng đăng nhập.');
- const r=await fetch(`${env.SUPABASE_URL}/auth/v1/user`,{headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,authorization:token}});
+ // Session check against Supabase Auth; the project key only identifies the project here.
+ const r=await fetch(`${env.SUPABASE_URL}/auth/v1/user`,{headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,authorization:token}});
  if(!r.ok)throw new HttpError(401,'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
  const user=await r.json();if(!UUID.test(user.id)||user.is_anonymous)throw new HttpError(401,'Vui lòng đăng nhập.');return user;
 }
@@ -70,33 +77,27 @@ export async function hydrate(data,viewer,origin,env){
  }
  return out;
 }
-// ---------- Storage: Cloudflare R2 binding (MEDIA_BUCKET) or Backblaze B2 (S3 API) ----------
-function b2URL(env,key){const base=new URL(env.B2_ENDPOINT);if(base.protocol!=='https:'||!base.hostname.endsWith('.backblazeb2.com'))throw new HttpError(503,'Kho ảnh chưa sẵn sàng.');return `${base.origin}/${encodeURIComponent(env.B2_BUCKET)}/${key.split('/').map(encodeURIComponent).join('/')}`;}
+// ---------- Storage: Backblaze B2 private bucket via the S3-compatible API ----------
+// Object layout: users/<uid>/images/<id>.jpg · users/<uid>/videos/<id>.mp4 · site/hero/<id>.jpg
+function b2URL(env,key){const base=new URL(b2Endpoint(env));if(base.protocol!=='https:'||!base.hostname.endsWith('.backblazeb2.com'))throw new HttpError(503,'Kho ảnh chưa sẵn sàng.');return `${base.origin}/${encodeURIComponent(env.B2_BUCKET)}/${key.split('/').map(encodeURIComponent).join('/')}`;}
 async function b2(env,key,method,body,headers={}){
  const client=new AwsClient({accessKeyId:env.B2_KEY_ID,secretAccessKey:env.B2_APPLICATION_KEY,region:env.B2_REGION,service:'s3'});
  return client.fetch(b2URL(env,key),{method,headers,body});
 }
 function requireStorage(env){const mode=storageMode(env);if(!mode)throw new HttpError(503,'Kho ảnh/video chưa được cấu hình. Vui lòng thử lại sau.');return mode;}
 async function putObject(env,key,bytes,mime){
- if(requireStorage(env)==='r2'){await env.MEDIA_BUCKET.put(key,bytes,{httpMetadata:{contentType:mime}});return;}
+ requireStorage(env);
  const r=await b2(env,key,'PUT',bytes,{'content-type':mime,'x-amz-server-side-encryption':'AES256'});if(!r.ok)throw new HttpError(502,'Chưa tải được file. Vui lòng thử lại.');
 }
 async function deleteObject(env,m){
- const mode=storageMode(env);
- if(mode==='r2')await env.MEDIA_BUCKET.delete(m.object_key);
- else if(mode==='b2'){const r=await b2(env,m.object_key,'DELETE');if(!r.ok&&r.status!==404)throw new HttpError(502,'Đang chờ xóa file khỏi kho ảnh. Hệ thống sẽ thử lại.');}
- else return; // no storage yet: the row stays 'deleting' and cron retries later
+ if(!storageMode(env))return; // no storage yet: row stays 'deleting'; cron retries later
+ const r=await b2(env,m.object_key,'DELETE');if(!r.ok&&r.status!==404)throw new HttpError(502,'Đang chờ xóa file khỏi kho ảnh. Hệ thống sẽ thử lại.');
  await rpc(env,null,'cleanup_done',{id:m.id});
 }
 async function readFile(req,env,media){
  const range=req.headers.get('range');if(range&&!/^bytes=\d*-\d*$/.test(range))throw new HttpError(416,'Range không hợp lệ.');
  const headers=new Headers({'content-type':media.mime,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline','accept-ranges':'bytes'});
- if(requireStorage(env)==='r2'){
-  const obj=await env.MEDIA_BUCKET.get(media.object_key,range?{range:req.headers}:undefined);
-  if(!obj)throw new HttpError(404,'Không tìm thấy ảnh/video.');
-  if(range&&obj.range){const off=obj.range.offset??0,len=obj.range.length??(obj.size-off);headers.set('content-range',`bytes ${off}-${off+len-1}/${obj.size}`);headers.set('content-length',String(len));return new Response(obj.body,{status:206,headers});}
-  headers.set('content-length',String(obj.size));return new Response(obj.body,{status:200,headers});
- }
+ requireStorage(env);
  const upstream=await b2(env,media.object_key,'GET',undefined,range?{range}:{});
  if(!upstream.ok)throw new HttpError(upstream.status===416?416:404,'Không tìm thấy ảnh/video.');
  for(const key of ['content-length','content-range'])if(upstream.headers.has(key))headers.set(key,upstream.headers.get(key));

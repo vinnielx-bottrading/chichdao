@@ -1,4 +1,4 @@
-CHI.CH DAO. export v0.4
-Frontend entry: dist/index.html · Admin: dist/admin.html
-API Worker (single file): cloudflare/worker.js · Guide: cloudflare/HUONG-DAN.md
-Database: supabase/schema.sql (run once on project oignkueulvvdfhgcvguv)
+CHI.CH DAO. export v0.5
+Frontend: dist/ (Vercel, outputDirectory=dist) · Admin: dist/admin.html · PWA: dist/manifest.webmanifest + dist/sw.js
+API Worker (single file): cloudflare/worker.js · Guide + variables: cloudflare/HUONG-DAN.md
+Database: supabase/schema.sql (run once) · Storage: Backblaze B2 private bucket
