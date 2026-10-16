@@ -1,4 +1,4 @@
-# CHI.CH DAO. — v0.10
+# CHI.CH DAO. — v0.11
 
 Ứng dụng hẹn hò nam–nam 18+, cài được như app (PWA). Frontend trên **Vercel**; API là **Cloudflare Worker**; **Supabase** làm database (và đăng nhập Google/email); **Backblaze B2** (bucket private) lưu ảnh/video. Hướng dẫn triển khai: `cloudflare/HUONG-DAN.md`.
 
@@ -73,8 +73,8 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 
 ## Nâng cấp database
 
-- **Cách đơn giản nhất: `supabase/chichdao-full.sql`** — 1 file, chạy 1 lần. Database trống thì cài mới v0.10; đã có app (v0.5 trở lên) thì nâng cấp lên v0.10 và giữ nguyên dữ liệu. Chạy lại vẫn an toàn; mọi thứ trong 1 transaction nên lỗi thì không thay đổi gì. File được tạo tự động bởi `npm run build` (`scripts/build-full-sql.mjs`).
-- Các file lẻ (`schema.sql`, `upgrade-v0.6…v0.10.sql`) vẫn giữ để tham khảo.
+- **Cách đơn giản nhất: `supabase/chichdao-full.sql`** — 1 file, chạy 1 lần. Database trống thì cài mới v0.11; đã có app (v0.5 trở lên) thì nâng cấp lên v0.11 và giữ nguyên dữ liệu. Chạy lại vẫn an toàn; mọi thứ trong 1 transaction nên lỗi thì không thay đổi gì. File được tạo tự động bởi `npm run build` (`scripts/build-full-sql.mjs`).
+- Các file lẻ (`schema.sql`, `upgrade-v0.6…v0.11.sql`) vẫn giữ để tham khảo.
 - Cài lại từ đầu (xóa dữ liệu app, giữ tài khoản đăng nhập): `supabase/reset-and-install.sql`.
 
 ## Quy tắc sản phẩm
@@ -85,6 +85,8 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 - Khách chưa đăng nhập hoặc vừa đăng xuất thấy trang đăng nhập 2 nửa: trái là form (bắt buộc tick xác nhận 18+), phải là ảnh admin chọn trong Admin → Cài đặt (slide chuyển ảnh mờ dần hoặc ảnh đơn, tối đa 12 ảnh, lưu tại `site/login/` trên B2).
 
 - Thẻ hồ sơ: bấm ảnh để xem chi tiết; 🔥 mở khung chat nổi với các câu thả thính do admin soạn (tab Thả thính 🔥 trong admin); 💬 mở khung chat nổi. Tin thả thính lưu với `kind='tease'` và chỉ gửi được câu admin đang bật.
+- Hồ sơ minh họa (Admin → Hồ sơ minh họa): admin tạo tối đa 200 hồ sơ (tạo nhanh nội dung chữ, gắn ảnh hàng loạt), bật/tắt bằng một công tắc (mặc định tắt). Thành viên luôn thấy nhãn **MINH HỌA** trên thẻ và dòng "Hồ sơ minh họa · không nhắn tin được"; bấm vào chỉ mở thông tin giới thiệu. Không nhắn tin, thả thính, thích hay báo cáo được (không gắn tài khoản đăng nhập). Hiện sau hồ sơ thật, chỉ trang đầu, không hiện khi tìm "ở gần". Ảnh lưu tại `site/samples/` trên B2; "Xóa tất cả" xóa luôn ảnh trên B2. Chỉ dùng ảnh AI hoặc ảnh có bản quyền.
+- Hồ sơ minh họa (Admin → Hồ sơ minh họa): tối đa 200 hồ sơ (tạo nhanh nội dung chữ, gắn ảnh hàng loạt), bật/tắt bằng một công tắc (mặc định tắt). Thành viên luôn thấy nhãn **MINH HỌA** và dòng "Hồ sơ minh họa · không nhắn tin được"; bấm vào chỉ mở thông tin giới thiệu. Không nhắn tin, thả thính, thích hay báo cáo được (không gắn tài khoản đăng nhập). Hiện sau hồ sơ thật, chỉ trang đầu, không hiện khi tìm "ở gần". Ảnh lưu tại `site/samples/` trên B2; "Xóa tất cả" xóa luôn ảnh. Chỉ dùng ảnh AI hoặc ảnh có bản quyền.
 - Khu vực: nhập tự do, có gợi ý 34 tỉnh/thành Việt Nam và các thành phố lớn trên thế giới; bộ lọc so khớp không dấu.
 
 - Hồ sơ hoàn thiện: tên 2–40 ký tự, tuổi tự khai 18–80, khu vực, mong muốn kết nối, giới thiệu 20–400 ký tự, xác nhận 18+, ít nhất 1 ảnh đã tải xong.
@@ -94,7 +96,7 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 - Mặc định **2 video**, mỗi video tối đa **20 MB**, MP4/WebM. Không tự chuyển mã video; khả năng phát tùy codec trình duyệt. Có thể điều chỉnh hạn mức trong SQL và giao diện.
 - Giới hạn số file được thực thi dưới transaction và advisory lock theo tài khoản. Slot đang tải cũng tính vào hạn mức. Slot lỗi được dọn, không cho tải đè slot đã hoàn thành.
 - Album hỗ trợ xem lớn ảnh/video, chú thích, chọn ảnh đại diện, xóa. Đặt video làm avatar bị từ chối.
-- Tin nhắn lưu trong DB, gửi kèm được 1 ảnh (≤ 8 MB) hoặc video (≤ 20 MB) mỗi tin; file tự lưu lên Backblaze B2 tại `users/<uid>/chat/`, chỉ người gửi/nhận và admin xem được. Hiện tải khi mở cuộc trò chuyện hoặc bấm Làm mới. Chưa có WebSocket, push notification hoặc xác nhận đã đọc.
+- Tin nhắn lưu trong DB, gửi kèm được 1 ảnh (≤ 8 MB) hoặc video (≤ 20 MB) mỗi tin; file tự lưu lên Backblaze B2 tại `users/<uid>/chat/`, chỉ người gửi/nhận và admin xem được. Tin mới tự hiện: cuộc trò chuyện đang mở (khung chat nổi hoặc trang Tin nhắn) cập nhật mỗi 4 giây mà không mất chữ đang gõ; mỗi 10 giây app kiểm tra tin chưa đọc → số đỏ trên mục Tin nhắn, trên từng cuộc trò chuyện và tiêu đề tab, kèm thông báo nhỏ có nút "Trả lời". Chỉ chạy khi tab đang mở (không có WebSocket/push notification khi đóng app). Tin được đánh dấu đã đọc khi người nhận mở cuộc trò chuyện.
 - Ảnh/video tự hủy trong chat: người gửi chọn 1 / 5 / 10 phút hoặc 1 giờ. Đếm ngược bắt đầu khi người nhận mở lần đầu; hết giờ DB chặn xem ngay, cron xóa file khỏi B2. Chưa mở sau 24 giờ cũng tự hủy. Người gửi chỉ thấy trạng thái (chưa xem / đã xem / đã hủy). Không tạo ảnh thu nhỏ, không cho trình duyệt lưu tạm (`no-store`). Người nhận vẫn có thể chụp màn hình.
 - Ảnh/video thường trong chat được giữ theo cài đặt Admin → Cài đặt → "Lưu trữ ảnh/video trong chat" (vĩnh viễn / 30 / 90 / 180 ngày / 1 năm); quá hạn thì cron xóa cả file trên B2.
 - Xóa tài khoản (hoặc xóa media) tự đưa file vào hàng đợi `chich_private.storage_trash`; cron của Worker (`*/30 * * * *`) xóa file thật trên B2. Muốn file tự hủy biến khỏi B2 nhanh hơn, đổi cron thành `*/10` hoặc `*/5`.

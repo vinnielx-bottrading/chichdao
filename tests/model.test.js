@@ -15,8 +15,12 @@ test('ten photos with strict client format and size checks',()=>{
 test('public interface contains no fictional membership claims or sample state',async()=>{
  for(const path of ['../dist/app.js','../dist/index.html','../dist/model.js']){
   const text=await readFile(new URL(path,import.meta.url),'utf8');
-  assert.doesNotMatch(text,/hồ sơ minh họa|nhân vật hư cấu|bản trải nghiệm|thử nghiệm|chichdao\.preview|defaultState/i);
+  assert.doesNotMatch(text,/nhân vật hư cấu|bản trải nghiệm|thử nghiệm|chichdao\.preview|defaultState/i);
  }
+ // Illustration profiles come only from the database (admin), are always labelled and can never be contacted.
+ const app=await readFile(new URL('../dist/app.js',import.meta.url),'utf8');
+ const sc=app.slice(app.indexOf('function sampleCard('),app.indexOf('function sampleDetails('));
+ assert.match(sc,/MINH HỌA/);assert.match(sc,/không nhắn tin được/);assert.doesNotMatch(sc,/data-(like|dock|tease|open)=/);
  const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
  assert.match(html,/id="auth-screen"/);assert.match(html,/id="auth-slides"/);assert.match(html,/id="profile-banner"/);assert.match(html,/id="chat-dock"/);
 });

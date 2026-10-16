@@ -1,6 +1,6 @@
 // CHI.CH DAO. service worker: lets the site install as an app and open fast.
 // Only same-origin static files are cached. API calls, media and auth never touch this cache.
-const VERSION='chichdao-v0.10.0';
+const VERSION='chichdao-v0.11.0';
 const SHELL=['./','index.html','themes.css','styles.css','themes.js','app.js','api.js','model.js','album.js','regions.js','manifest.webmanifest','assets/logos/logo-navy-coral.png','assets/favicon.svg','assets/long-1.jpg','assets/DejaVuSans.ttf','assets/DejaVuSans-Bold.ttf','assets/icons/icon-192.png','assets/icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});

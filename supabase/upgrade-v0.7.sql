@@ -2,7 +2,7 @@
 -- Chạy 1 lần trong Supabase SQL Editor (chạy lại cũng an toàn).
 begin;
 alter table public.cd_media drop constraint if exists cd_media_purpose_check;
-alter table public.cd_media add constraint cd_media_purpose_check check(purpose in ('profile','hero','chat','slide'));
+alter table public.cd_media add constraint cd_media_purpose_check check(purpose in ('profile','hero','chat','slide','sample'));
 alter table public.cd_settings add column if not exists login_mode text not null default 'slide';
 alter table public.cd_settings add column if not exists login_interval integer not null default 6;
 alter table public.cd_settings drop constraint if exists cd_settings_login_mode_check;

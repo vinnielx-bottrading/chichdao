@@ -1,6 +1,7 @@
 import {api,adminAuth,signIn,signInPassword,signOut,supabase,configured,upload,hero,config} from './api.js';
 import {preparePhoto} from './album.js';
 import {THEMES,themeById} from './themes.js';
+import {occupations,bodyTypes,lifestyles,trainingStyles} from './model.js';
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -11,9 +12,9 @@ const ago=s=>{if(!s)return '—';const m=Math.round((Date.now()-new Date(s))/600
 const bytes=b=>b>1048576?`${(b/1048576).toFixed(1)} MB`:`${Math.round((b||0)/1024)} KB`;
 const place=(o)=>[o.city||o.lastCity||o.last_city,o.country||o.lastCountry||o.last_country].filter(Boolean).join(', ')||'—';
 const EVENTS={SIGNED_IN:'Đăng nhập',INITIAL_SESSION:'Mở ứng dụng',session:'Mở ứng dụng',USER_UPDATED:'Cập nhật tài khoản',logout:'Đăng xuất',accept_adult:'Xác nhận 18+',profile_save:'Lưu hồ sơ',visibility:'Đổi hiển thị',location:'Bật vị trí',location_off:'Tắt vị trí',like:'Thích',unlike:'Bỏ thích',block:'Chặn',unblock:'Bỏ chặn',report:'Báo cáo',send:'Gửi tin nhắn',finish_media:'Tải ảnh/video',tease:'Thả thính 🔥',app_installed:'Cài ứng dụng',delete_media:'Xóa ảnh/video'};
-const AUDIT={view_user:'Xem hồ sơ',view_chat:'Đọc hội thoại',suspend:'Khóa/mở khóa',delete_media:'Xóa media',resolve_report:'Xử lý báo cáo',create_user:'Tạo người dùng',teaser_save:'Lưu câu thả thính',login_settings:'Cài đặt trang đăng nhập',chat_retention:'Hạn lưu ảnh chat',theme:'Đổi giao diện',feedback_delete:'Xóa góp ý',teaser_delete:'Xóa câu thả thính',update_auth:'Đổi email/mật khẩu'};
+const AUDIT={samples_toggle:'Bật/tắt hồ sơ minh họa',sample_save:'Lưu hồ sơ minh họa',samples_bulk:'Tạo nhanh hồ sơ minh họa',sample_delete:'Xóa hồ sơ minh họa',samples_clear:'Xóa tất cả hồ sơ minh họa',view_user:'Xem hồ sơ',view_chat:'Đọc hội thoại',suspend:'Khóa/mở khóa',delete_media:'Xóa media',resolve_report:'Xử lý báo cáo',create_user:'Tạo người dùng',teaser_save:'Lưu câu thả thính',login_settings:'Cài đặt trang đăng nhập',chat_retention:'Hạn lưu ảnh chat',theme:'Đổi giao diện',feedback_delete:'Xóa góp ý',teaser_delete:'Xóa câu thả thính',update_auth:'Đổi email/mật khẩu'};
 const ev=e=>EVENTS[e]||e;
-const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['teasers','Thả thính 🔥'],['feedback','Góp ý'],['audit','Nhật ký admin'],['settings','Cài đặt']];
+const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['teasers','Thả thính 🔥'],['samples','Hồ sơ minh họa'],['feedback','Góp ý'],['audit','Nhật ký admin'],['settings','Cài đặt']];
 
 let me=null,tab='overview',charts=[],stats=null,authBusy=false,lastToken='';
 const state={users:{q:'',filter:'all',rows:[],done:false},media:{kind:'all',purpose:'all',rows:[],done:false},activity:{event:'all',rows:[],done:false},chats:{rows:[],a:'',b:'',done:false}};
@@ -56,6 +57,7 @@ async function render(){
   if(tab==='audit')await audit();
   if(tab==='teasers')await teasersView();
   if(tab==='feedback')await feedbackView();
+  if(tab==='samples')await samplesView();
   if(tab==='settings')settingsView();
  }catch(e){v.innerHTML=empty(e.message);}
 }
@@ -261,6 +263,57 @@ async function settingsView(){
   toast(`Đã thêm ${n} ảnh.`);settingsView();};
  $('#hero-img').onchange=e=>{const f=e.target.files?.[0];if(f)$('#hero-prev').src=URL.createObjectURL(f);};
  $('#hero-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{const p=await preparePhoto(f.image.files[0]);const id=await upload(p.blob,'hero');await api('admin_hero',{id,alt:f.alt.value});toast('Đã thay ảnh hero.');});};
+}
+
+/* ---------------- Illustration profiles (Hồ sơ minh họa) ---------------- */
+// Always shown to members with a "MINH HỌA" label; they cannot be messaged, liked or sent 🔥. Off by default.
+const INTENTS=['Mối quan hệ nghiêm túc','Hẹn hò thoải mái','Trò chuyện rồi tìm hiểu'];
+const S_NAMES=['Minh','Huy','Long','Tú','Khoa','Nam','Phong','Quân','Đạt','Hải','Tuấn','Bảo','Duy','Hoàng','Khang','Lâm','Nhân','Phúc','Sơn','Tài','Thắng','Thịnh','Trí','Trung','Việt','Vũ','An','Bình','Cường','Danh','Dũng','Hiếu','Hưng','Kiên','Lộc','Lực','Mạnh','Nghĩa','Nguyên','Quang','Tâm','Thái','Thành','Thiện','Toàn','Trọng','Tùng','Vinh','Vĩ','Xuân'];
+const S_CITIES=['TP. Hồ Chí Minh','TP. Hồ Chí Minh','TP. Hồ Chí Minh','Hà Nội','Hà Nội','Hà Nội','Đà Nẵng','Đà Nẵng','Hải Phòng','Cần Thơ','Khánh Hòa','Lâm Đồng','Huế','Đồng Nai','Bắc Ninh','Quảng Ninh','An Giang','Bangkok, Thái Lan','Singapore'];
+const S_BIOS=['Sáng chạy bộ, tối cà phê. Thích người nói chuyện thẳng thắn.','Dân văn phòng ban ngày, tối ra phòng gym xả stress. Tìm người cùng nhịp.','Mê leo núi và cắm trại cuối tuần. Ai đi cùng không?','Thích nấu ăn cho người mình quý. Món tủ là bò kho.','Ít nói lúc đầu, quen rồi nói không ngừng.','Đang tập powerlifting, tìm bạn tập chung và hơn thế nữa.','Yêu biển, yêu nắng, ghét trễ hẹn.','Làm vườn ở quê, lên phố cuối tuần. Giản dị nhưng chân thành.','Thợ kỹ thuật, tay chân lấm lem nhưng tim thì sạch sẽ 😄','Thích xem phim, đi ăn vặt và những buổi tối không vội.','Tập calisthenics ở công viên mỗi sáng. Ghé chào nhé.','Muốn tìm một người để cùng đi du lịch bụi.','Hay cười, thích nghe nhạc acoustic, ghét drama.','PT tự do, sẵn sàng chỉ bài tập miễn phí cho người dễ thương.','Mới chuyển tới thành phố, cần người dẫn đi ăn ngon.','Thích cà phê muối và những cuộc trò chuyện dài.','Đi bơi 3 buổi một tuần. Tìm người cùng giữ thói quen tốt.','Chân thành, rõ ràng, tôn trọng ranh giới của nhau.','Nghiện bóng đá cuối tuần, còn lại dành cho người thương.','Thích chụp ảnh đường phố. Biết đâu bạn là tấm ảnh đẹp nhất.','Không cần hoàn hảo, chỉ cần thật lòng.','Hay dậy sớm, thích nấu bữa sáng cho hai người.'];
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function sampleDraft(n){const names=[...S_NAMES].sort(()=>Math.random()-.5);return Array.from({length:n},(_,i)=>({name:names[i%names.length],age:21+Math.floor(Math.random()*20),city:pick(S_CITIES),occupation:pick(occupations.slice(0,5)),bodyType:pick(bodyTypes),lifestyle:pick(lifestyles),training:pick(trainingStyles),intent:pick(INTENTS),bio:pick(S_BIOS)}));}
+let sampleList=[];
+async function samplesView(){
+ const d=await api('admin_samples');sampleList=d.items||[];const noPhoto=sampleList.filter(x=>!x.photos?.length).length;
+ const opt=(list,v)=>`<option value="">—</option>`+list.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
+ $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">KHÁM PHÁ</span><h1>Hồ sơ minh họa</h1><p>Giúp trang Khám phá không trống trong giai đoạn đầu. Thành viên luôn thấy nhãn <b>MINH HỌA</b> trên thẻ, và bấm vào chỉ mở thông tin giới thiệu; không nhắn tin, thả thính hay thích được. Hiện sau các hồ sơ thật, chỉ ở trang đầu, không hiện khi tìm "ở gần".</p></div></div>
+ <section class="card" style="margin-bottom:16px"><div class="toolbar" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <label class="switch-line"><input type="checkbox" id="sp-on" ${d.enabled?'checked':''}> <b>Hiển thị trong Khám phá</b> <span class="tag ${d.enabled?'ok':''}">${d.enabled?'Đang bật':'Đang tắt'}</span></label>
+  <span class="muted">${sampleList.length}/200 hồ sơ · ${noPhoto} chưa có ảnh</span></div>
+  <p class="sub" style="margin-top:10px">Ảnh: dùng ảnh AI hoặc ảnh có bản quyền. <b>Không dùng ảnh người thật khi chưa có sự đồng ý</b> — trên app nam–nam điều này có thể làm lộ danh tính của họ.</p>
+  <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-top:12px">
+   <button class="btn primary" id="sp-add">＋ Thêm hồ sơ</button>
+   <form id="sp-gen" class="toolbar" style="gap:6px"><label>Tạo nhanh <input name="n" type="number" min="1" max="100" value="${Math.max(1,Math.min(100,50-sampleList.length))||10}" style="width:70px"> hồ sơ (chỉ chữ)</label><button class="btn">Tạo</button></form>
+   <label class="btn" title="Chọn nhiều ảnh: gắn lần lượt cho các hồ sơ chưa có ảnh">🖼 Gắn ảnh hàng loạt<input id="sp-bulk" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>
+   <button class="btn danger" id="sp-clear" ${sampleList.length?'':'disabled'}>Xóa tất cả</button>
+   <small class="muted" id="sp-progress"></small></div></section>
+ <div class="slide-grid">${sampleList.map(x=>{const m=x.photos?.[0];return `<article class="slide-item sample-item ${x.active?'':'off'}">${m?`<img src="${safeURL(m.thumb||m.src)}" alt="" loading="lazy">`:`<div class="sample-ph">${esc(x.name[0])}<small>Chưa có ảnh</small></div>`}<div class="slide-meta" style="display:block"><b>${esc(x.name)}, ${x.age}</b><div class="muted small">${esc(x.city)}${x.active?'':' · đang ẩn'}</div><div class="toolbar" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn" data-sp-edit="${x.id}">Sửa</button><label class="btn">Ảnh<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" data-sp-photo="${x.id}" hidden></label><button class="btn danger" data-sp-del="${x.id}">Xóa</button></div></div></article>`;}).join('')||empty('Chưa có hồ sơ minh họa. Bấm "Tạo nhanh" để có sẵn nội dung, rồi gắn ảnh.')}</div>`;
+ $('#sp-on').onchange=async e=>{try{await api('admin_samples_toggle',{enabled:e.target.checked});toast(e.target.checked?'Đã bật hồ sơ minh họa.':'Đã tắt hồ sơ minh họa.');samplesView();}catch(err){toast(err.message);}};
+ $('#sp-add').onclick=()=>sampleForm(null,opt);
+ $('#sp-gen').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{const r=await api('admin_samples_bulk',{items:sampleDraft(Math.max(1,Math.min(100,Number(f.n.value)||1)))});toast(`Đã tạo ${r.count} hồ sơ. Sửa nội dung và gắn ảnh tùy ý.`);samplesView();});};
+ $('#sp-clear').onclick=async e=>{if(!confirmInline(e.target,'Bấm lần nữa để xóa hết'))return;try{await api('admin_samples_clear');toast('Đã xóa tất cả hồ sơ minh họa và ảnh của chúng.');samplesView();}catch(err){toast(err.message);}};
+ $('#sp-bulk').onchange=async e=>{const files=[...e.target.files];e.target.value='';const targets=sampleList.filter(x=>!x.photos?.length);if(!files.length)return;if(!targets.length){toast('Mọi hồ sơ đều đã có ảnh.');return;}
+  const pr=$('#sp-progress');let n=0;for(const [i,f] of files.slice(0,targets.length).entries()){try{pr.textContent=`Đang xử lý ảnh ${i+1}/${Math.min(files.length,targets.length)}…`;await samplePhoto(targets[i],f,x=>{pr.textContent=`Đang tải ${i+1}/${Math.min(files.length,targets.length)} · ${Math.round(x*100)}%`;});n++;}catch(err){toast(`${f.name}: ${err.message}`);}}
+  toast(`Đã gắn ${n} ảnh${files.length>targets.length?` (bỏ qua ${files.length-targets.length} ảnh thừa)`:''}.`);samplesView();};
+ document.querySelectorAll('[data-sp-photo]').forEach(inp=>inp.onchange=async e=>{const f=e.target.files?.[0];if(!f)return;const x=sampleList.find(s=>s.id===inp.dataset.spPhoto);try{$('#sp-progress').textContent=`Đang tải ảnh cho ${x.name}…`;await samplePhoto(x,f);toast('Đã đổi ảnh.');}catch(err){toast(err.message);}samplesView();});
+ document.querySelectorAll('[data-sp-edit]').forEach(b=>b.onclick=()=>sampleForm(sampleList.find(s=>s.id===b.dataset.spEdit),opt));
+ document.querySelectorAll('[data-sp-del]').forEach(b=>b.onclick=async()=>{if(!confirmInline(b,'Bấm lần nữa'))return;try{await api('admin_sample_delete',{id:b.dataset.spDel});toast('Đã xóa.');samplesView();}catch(err){toast(err.message);}});
+}
+function sampleFields(x){return {id:x.id,name:x.name,age:x.age,city:x.city,occupation:x.occupation,bodyType:x.bodyType,lifestyle:x.lifestyle,training:x.training,intent:x.intent,bio:x.bio,active:x.active,position:x.position};}
+async function samplePhoto(x,file,onProgress){const p=await preparePhoto(file);const id=await upload(p.blob,'sample',onProgress,p.thumb);await api('admin_sample_save',{...sampleFields(x),mediaId:id});}
+function sampleForm(x,opt){
+ openDrawer(`<div class="drawer-top"><div><span class="eyebrow">HỒ SƠ MINH HỌA</span><h2>${x?'Sửa hồ sơ minh họa':'Thêm hồ sơ minh họa'}</h2></div><button class="x" data-close aria-label="Đóng">×</button></div>
+ <form id="sp-form" class="stack sp-form"><label>Tên hiển thị<input name="name" required minlength="2" maxlength="40" value="${esc(x?.name||'')}"></label><label>Tuổi<input name="age" type="number" min="18" max="80" required value="${x?.age||25}"></label>
+ <label>Khu vực<input name="city" maxlength="80" value="${esc(x?.city||'')}"></label>
+ <label>Nghề nghiệp<select name="occupation">${opt(occupations,x?.occupation)}</select></label><label>Vóc dáng<select name="bodyType">${opt(bodyTypes,x?.bodyType)}</select></label>
+ <label>Lối sống<select name="lifestyle">${opt(lifestyles,x?.lifestyle)}</select></label><label>Cách vận động<select name="training">${opt(trainingStyles,x?.training)}</select></label>
+ <label>Mong muốn kết nối<select name="intent">${opt(INTENTS,x?.intent)}</select></label><label>Giới thiệu<textarea name="bio" maxlength="400" rows="3">${esc(x?.bio||'')}</textarea></label>
+ <label>Ảnh ${x?.photos?.length?'(để trống nếu giữ ảnh cũ)':''}<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"></label>
+ <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="active" ${x?.active===false?'':'checked'}> Hiển thị hồ sơ này</label><button class="btn primary">Lưu</button></form>`);
+ $('#sp-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{const data={...(x?{id:x.id,position:x.position}:{}),name:f.name.value,age:Number(f.age.value),city:f.city.value,occupation:f.occupation.value,bodyType:f.bodyType.value,lifestyle:f.lifestyle.value,training:f.training.value,intent:f.intent.value,bio:f.bio.value,active:f.active.checked};
+  const file=f.photo.files?.[0];if(file){const p=await preparePhoto(file);data.mediaId=await upload(p.blob,'sample',null,p.thumb);}
+  await api('admin_sample_save',data);toast('Đã lưu.');closeDrawer();samplesView();});};
 }
 
 /* ---------------- Global clicks ---------------- */

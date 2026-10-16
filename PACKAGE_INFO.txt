@@ -1,4 +1,4 @@
-CHI.CH DAO. export v0.10
+CHI.CH DAO. export v0.11
 Frontend: dist/ (Vercel) · Admin: dist/admin.html
-API Worker: cloudflare/worker.js (CHANGED in v0.10 — paste again)
+API Worker: cloudflare/worker.js (unchanged since v0.10 — no need to paste again)
 Database: supabase/chichdao-full.sql — ONE file, run once (fresh install or upgrade, keeps data)
