@@ -4,8 +4,8 @@ import {photoValidationError,photoLimits,occupations,bodyTypes} from '../dist/mo
 import {readFile} from 'node:fs/promises';
 test('ten photos with strict client format and size checks',()=>{
  assert.equal(photoLimits.maxCount,10);
- assert.equal(photoValidationError({type:'image/jpeg',size:photoLimits.maxBytes}),'');
- assert.ok(photoValidationError({type:'image/jpeg',size:photoLimits.maxBytes+1}));
+ assert.equal(photoValidationError({type:'image/jpeg',size:photoLimits.maxOriginalBytes}),'');assert.equal(photoValidationError({type:'image/jpeg',size:12*1024*1024}),'');
+ assert.ok(photoValidationError({type:'image/jpeg',size:photoLimits.maxOriginalBytes+1}));
  assert.ok(photoValidationError({type:'image/svg+xml',size:100}));
  assert.ok(photoValidationError({type:'image/png',size:0}));
  assert.ok(occupations.includes('Nông dân / Làm vườn'));

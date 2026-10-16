@@ -282,7 +282,7 @@ function guessServiceRegion(url, headers) {
 // worker/index.js
 var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 var EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
-var WORKER_ONLY = /* @__PURE__ */ new Set(["hero", "hero_file", "cleanup_list", "cleanup_expired", "cleanup_done", "reserve_media", "claim_media", "finish_media", "delete_media", "media_file", "admin_audit_add"]);
+var WORKER_ONLY = /* @__PURE__ */ new Set(["hero", "hero_file", "cleanup_list", "cleanup_expired", "cleanup_done", "reserve_media", "claim_media", "finish_media", "delete_media", "media_file", "claim_thumb", "finish_thumb", "admin_audit_add"]);
 function clientAction(a) {
   return typeof a === "string" && /^[a-z_]{2,40}$/.test(a) && !WORKER_ONLY.has(a);
 }
@@ -398,16 +398,23 @@ async function signMedia(secret, id, viewer, expires) {
   return Array.from(new Uint8Array(await crypto.subtle.sign("HMAC", key, bytes))).map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 async function verifyMedia(secret, id, viewer, expires, sig) {
-  if (!UUID.test(id) || !UUID.test(viewer) || !/^\d+$/.test(String(expires)) || Number(expires) < Date.now() / 1e3 || Number(expires) > Date.now() / 1e3 + 610 || !/^[0-9a-f]{64}$/.test(sig || "")) return false;
+  if (!UUID.test(id) || !UUID.test(viewer) || !/^\d+$/.test(String(expires)) || Number(expires) < Date.now() / 1e3 || Number(expires) > Date.now() / 1e3 + 1210 || !/^[0-9a-f]{64}$/.test(sig || "")) return false;
   const { key, bytes } = await hmac2(secret, `${id}:${viewer}:${expires}`);
   return crypto.subtle.verify("HMAC", key, Uint8Array.from(sig.match(/../g), (h) => parseInt(h, 16)), bytes);
+}
+function mediaExpiry(now = Date.now()) {
+  return (Math.floor(now / 1e3 / 600) + 2) * 600;
 }
 async function hydrate(data, viewer, origin, env) {
   if (Array.isArray(data)) return Promise.all(data.map((x) => hydrate(x, viewer, origin, env)));
   if (!data || typeof data !== "object") return data;
-  const expires = Math.floor(Date.now() / 1e3) + 600, out = {};
+  const expires = mediaExpiry(), out = {};
   for (const [k, v] of Object.entries(data)) {
-    if ((k === "photos" || k === "media") && Array.isArray(v)) out[k] = await Promise.all(v.map(async (m) => m && UUID.test(m.id || "") && (!m.status || m.status === "ready") ? { ...m, src: `${origin}/media/${m.id}?viewer=${viewer}&expires=${expires}&sig=${await signMedia(env.MEDIA_SIGNING_SECRET, m.id, viewer, expires)}` } : m));
+    if ((k === "photos" || k === "media") && Array.isArray(v)) out[k] = await Promise.all(v.map(async (m) => {
+      if (!(m && UUID.test(m.id || "") && (!m.status || m.status === "ready"))) return m;
+      const src = `${origin}/media/${m.id}?viewer=${viewer}&expires=${expires}&sig=${await signMedia(env.MEDIA_SIGNING_SECRET, m.id, viewer, expires)}`;
+      return { ...m, src, thumb: m.thumb === true ? `${src}&size=thumb` : void 0 };
+    }));
     else out[k] = v && typeof v === "object" ? await hydrate(v, viewer, origin, env) : v;
   }
   return out;
@@ -435,14 +442,19 @@ async function deleteObject(env, m) {
   if (!storageMode(env)) return;
   const r = await b2(env, m.object_key, "DELETE");
   if (!r.ok && r.status !== 404) throw new HttpError(502, "\u0110ang ch\u1EDD x\xF3a file kh\u1ECFi kho \u1EA3nh. H\u1EC7 th\u1ED1ng s\u1EBD th\u1EED l\u1EA1i.");
+  if (m.thumb_key) {
+    const t = await b2(env, m.thumb_key, "DELETE");
+    if (!t.ok && t.status !== 404) throw new HttpError(502, "\u0110ang ch\u1EDD x\xF3a \u1EA3nh thu nh\u1ECF. H\u1EC7 th\u1ED1ng s\u1EBD th\u1EED l\u1EA1i.");
+  }
   await rpc(env, null, "cleanup_done", { id: m.id });
 }
-async function readFile(req, env, media) {
+async function readFile(req, env, media, { thumb = false, cache = "private, max-age=600" } = {}) {
   const range = req.headers.get("range");
   if (range && !/^bytes=\d*-\d*$/.test(range)) throw new HttpError(416, "Range kh\xF4ng h\u1EE3p l\u1EC7.");
-  const headers = new Headers({ "content-type": media.mime, "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-disposition": "inline", "accept-ranges": "bytes" });
+  const useThumb = thumb && media.thumb_ready && media.thumb_key;
+  const headers = new Headers({ "content-type": useThumb ? media.thumb_mime : media.mime, "cache-control": media.cache_control === "no-store" ? "no-store" : cache, "x-content-type-options": "nosniff", "content-disposition": "inline", "accept-ranges": "bytes" });
   requireStorage(env);
-  const upstream = await b2(env, media.object_key, "GET", void 0, range ? { range } : {});
+  const upstream = await b2(env, useThumb ? media.thumb_key : media.object_key, "GET", void 0, range ? { range } : {});
   if (!upstream.ok) throw new HttpError(upstream.status === 416 ? 416 : 404, "Kh\xF4ng t\xECm th\u1EA5y \u1EA3nh/video.");
   for (const key of ["content-length", "content-range"]) if (upstream.headers.has(key)) headers.set(key, upstream.headers.get(key));
   return new Response(upstream.body, { status: upstream.status, headers });
@@ -489,12 +501,12 @@ async function handle(req, env) {
   if (req.method === "GET" && path.startsWith("/hero/")) {
     const id = path.slice(6);
     if (!UUID.test(id)) throw new HttpError(404, "Kh\xF4ng t\xECm th\u1EA5y \u1EA3nh.");
-    return readFile(req, env, await rpc(env, null, "hero_file", { id }));
+    return readFile(req, env, await rpc(env, null, "hero_file", { id }), { cache: "public, max-age=86400" });
   }
   if (req.method === "GET" && path.startsWith("/media/")) {
     const id = path.slice(7), viewer = url.searchParams.get("viewer"), expires = url.searchParams.get("expires"), sig = url.searchParams.get("sig");
     if (!await verifyMedia(env.MEDIA_SIGNING_SECRET, id, viewer, expires, sig)) throw new HttpError(403, "Li\xEAn k\u1EBFt \u1EA3nh h\u1EBFt h\u1EA1n. H\xE3y t\u1EA3i l\u1EA1i h\u1ED3 s\u01A1.");
-    return readFile(req, env, await rpc(env, viewer, "media_file", { id }));
+    return readFile(req, env, await rpc(env, viewer, "media_file", { id }), { thumb: url.searchParams.get("size") === "thumb" });
   }
   const user = await actor(req, env);
   if (req.method === "POST" && path === "/api") {
@@ -518,6 +530,17 @@ async function handle(req, env) {
     const data = await jsonBody(req);
     const m = await rpc(env, user.id, "reserve_media", data);
     return json({ id: m.id, uploadUrl: `${url.origin}/uploads/${m.id}` });
+  }
+  if (req.method === "PUT" && /^\/uploads\/[0-9a-f-]{36}\/thumb$/i.test(path)) {
+    const id = path.slice(9, 45);
+    if (!UUID.test(id)) throw new HttpError(400, "File kh\xF4ng h\u1EE3p l\u1EC7.");
+    requireStorage(env);
+    const m = await rpc(env, user.id, "claim_thumb", { id });
+    const bytes = await boundedBody(req, m.thumb_bytes);
+    if (bytes.byteLength !== m.thumb_bytes || sniffMime(bytes) !== m.thumb_mime) throw new HttpError(415, "\u1EA2nh thu nh\u1ECF kh\xF4ng kh\u1EDBp \u0111\u1ECBnh d\u1EA1ng.");
+    await putObject(env, m.thumb_key, bytes, m.thumb_mime);
+    await rpc(env, user.id, "finish_thumb", { id });
+    return json({ id, thumb: true });
   }
   if (req.method === "PUT" && path.startsWith("/uploads/")) {
     const id = path.slice(9);
@@ -593,6 +616,7 @@ export {
   index_default as default,
   deviceLabel,
   hydrate,
+  mediaExpiry,
   signMedia,
   sniffMime,
   storageMode,

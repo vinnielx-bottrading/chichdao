@@ -1,4 +1,4 @@
-# CHI.CH DAO. — v0.8
+# CHI.CH DAO. — v0.10
 
 Ứng dụng hẹn hò nam–nam 18+, cài được như app (PWA). Frontend trên **Vercel**; API là **Cloudflare Worker**; **Supabase** làm database (và đăng nhập Google/email); **Backblaze B2** (bucket private) lưu ảnh/video. Hướng dẫn triển khai: `cloudflare/HUONG-DAN.md`.
 
@@ -73,8 +73,8 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 
 ## Nâng cấp database
 
-- Cài mới (chưa có dữ liệu): `supabase/schema.sql`.
-- Đang chạy bản cũ, muốn giữ dữ liệu: chạy lần lượt `supabase/upgrade-v0.6.sql`, `upgrade-v0.7.sql`, `upgrade-v0.8.sql` (chạy lại nhiều lần cũng an toàn).
+- **Cách đơn giản nhất: `supabase/chichdao-full.sql`** — 1 file, chạy 1 lần. Database trống thì cài mới v0.10; đã có app (v0.5 trở lên) thì nâng cấp lên v0.10 và giữ nguyên dữ liệu. Chạy lại vẫn an toàn; mọi thứ trong 1 transaction nên lỗi thì không thay đổi gì. File được tạo tự động bởi `npm run build` (`scripts/build-full-sql.mjs`).
+- Các file lẻ (`schema.sql`, `upgrade-v0.6…v0.10.sql`) vẫn giữ để tham khảo.
 - Cài lại từ đầu (xóa dữ liệu app, giữ tài khoản đăng nhập): `supabase/reset-and-install.sql`.
 
 ## Quy tắc sản phẩm
@@ -90,11 +90,14 @@ Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase c
 - Hồ sơ hoàn thiện: tên 2–40 ký tự, tuổi tự khai 18–80, khu vực, mong muốn kết nối, giới thiệu 20–400 ký tự, xác nhận 18+, ít nhất 1 ảnh đã tải xong.
 - Nghề nghiệp, vóc dáng, lối sống, cách vận động là tùy chọn. Có nông dân/làm vườn và công nhân/thợ kỹ thuật.
 - Chỉ hồ sơ hoàn thiện, đang hiển thị, không bị khóa và không chặn nhau xuất hiện trong Khám phá. Người chưa hoàn thiện được xem hồ sơ nhưng phải hoàn thiện trước khi gửi lời chào.
-- Tối đa **10 ảnh**, mỗi ảnh tối đa **8 MB**; JPEG/PNG/WebP. Frontend mã hóa lại JPEG, tối đa 1600 px cạnh dài, không sao chép EXIF; tối thiểu 200 × 200 px. API kiểm tra chữ ký định dạng và dung lượng. API không có bộ giải mã ảnh đầy đủ hoặc quét nội dung tự động.
+- Tối đa **10 ảnh**. Người dùng chọn ảnh gốc tới **30 MB** (JPG/PNG/WebP/HEIC); app nén ngay trên máy: WebP (hoặc JPEG nếu trình duyệt không hỗ trợ), cạnh dài tối đa 1600 px, tự hạ chất lượng 85% → 72% để file ~≤600 KB, bỏ EXIF/GPS; kèm ảnh thu nhỏ 480 px (`<id>_t.webp` trên B2) dùng cho thẻ hồ sơ, danh sách, chat. Ảnh lớn chỉ tải khi mở xem. Link ảnh ổn định theo khung 10 phút để trình duyệt lưu tạm (`private, max-age=600`). API kiểm tra chữ ký định dạng và dung lượng. API không có bộ giải mã ảnh đầy đủ hoặc quét nội dung tự động.
 - Mặc định **2 video**, mỗi video tối đa **20 MB**, MP4/WebM. Không tự chuyển mã video; khả năng phát tùy codec trình duyệt. Có thể điều chỉnh hạn mức trong SQL và giao diện.
 - Giới hạn số file được thực thi dưới transaction và advisory lock theo tài khoản. Slot đang tải cũng tính vào hạn mức. Slot lỗi được dọn, không cho tải đè slot đã hoàn thành.
 - Album hỗ trợ xem lớn ảnh/video, chú thích, chọn ảnh đại diện, xóa. Đặt video làm avatar bị từ chối.
 - Tin nhắn lưu trong DB, gửi kèm được 1 ảnh (≤ 8 MB) hoặc video (≤ 20 MB) mỗi tin; file tự lưu lên Backblaze B2 tại `users/<uid>/chat/`, chỉ người gửi/nhận và admin xem được. Hiện tải khi mở cuộc trò chuyện hoặc bấm Làm mới. Chưa có WebSocket, push notification hoặc xác nhận đã đọc.
+- Ảnh/video tự hủy trong chat: người gửi chọn 1 / 5 / 10 phút hoặc 1 giờ. Đếm ngược bắt đầu khi người nhận mở lần đầu; hết giờ DB chặn xem ngay, cron xóa file khỏi B2. Chưa mở sau 24 giờ cũng tự hủy. Người gửi chỉ thấy trạng thái (chưa xem / đã xem / đã hủy). Không tạo ảnh thu nhỏ, không cho trình duyệt lưu tạm (`no-store`). Người nhận vẫn có thể chụp màn hình.
+- Ảnh/video thường trong chat được giữ theo cài đặt Admin → Cài đặt → "Lưu trữ ảnh/video trong chat" (vĩnh viễn / 30 / 90 / 180 ngày / 1 năm); quá hạn thì cron xóa cả file trên B2.
+- Xóa tài khoản (hoặc xóa media) tự đưa file vào hàng đợi `chich_private.storage_trash`; cron của Worker (`*/30 * * * *`) xóa file thật trên B2. Muốn file tự hủy biến khỏi B2 nhanh hơn, đổi cron thành `*/10` hoặc `*/5`.
 - Tìm ở gần: chỉ lấy GPS sau thao tác cho phép, làm tròn tọa độ đến 0,01 độ; chọn 5/10/25/50/100 km. Chỉ trả nhóm khoảng cách, không trả tọa độ, không sắp xếp theo mét chính xác. Vị trí hết hiệu lực sau 24 giờ, cron xóa bản ghi hết hạn; người dùng tắt để xóa ngay.
 - Tìm ở gần dùng Haversine trong PostgreSQL với bộ lọc vĩ độ trước khi tính. Sai số do làm tròn có thể ảnh hưởng hồ sơ sát ranh giới bán kính. Cần chuyển sang PostGIS/GiST khi lượng dữ liệu lớn.
 - Tuổi, nghề nghiệp, vóc dáng là thông tin tự khai. Google login không chứng minh người dùng đủ 18 tuổi hoặc xác minh ngoại hình/nghề nghiệp.

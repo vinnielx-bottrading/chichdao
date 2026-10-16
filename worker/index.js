@@ -5,7 +5,7 @@ const EMAIL=/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 // Client-callable actions are decided by the database (it rejects unknown ones and checks every permission).
 // The Worker only blocks actions that must never come from a browser: media/upload lifecycle, cleanup jobs,
 // public hero reads and audit writes. New features in the DB therefore need no Worker redeploy.
-const WORKER_ONLY=new Set(['hero','hero_file','cleanup_list','cleanup_expired','cleanup_done','reserve_media','claim_media','finish_media','delete_media','media_file','admin_audit_add']);
+const WORKER_ONLY=new Set(['hero','hero_file','cleanup_list','cleanup_expired','cleanup_done','reserve_media','claim_media','finish_media','delete_media','media_file','claim_thumb','finish_thumb','admin_audit_add']);
 export function clientAction(a){return typeof a==='string'&&/^[a-z_]{2,40}$/.test(a)&&!WORKER_ONLY.has(a);}
 const enc=new TextEncoder();
 class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
@@ -66,22 +66,25 @@ async function actor(req,env){
 async function hmac(secret,message){const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);return {key,bytes:enc.encode(message)};}
 export async function signMedia(secret,id,viewer,expires){const {key,bytes}=await hmac(secret,`${id}:${viewer}:${expires}`);return Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');}
 export async function verifyMedia(secret,id,viewer,expires,sig){
- if(!UUID.test(id)||!UUID.test(viewer)||!/^\d+$/.test(String(expires))||Number(expires)<Date.now()/1000||Number(expires)>Date.now()/1000+610||!/^[0-9a-f]{64}$/.test(sig||''))return false;
+ if(!UUID.test(id)||!UUID.test(viewer)||!/^\d+$/.test(String(expires))||Number(expires)<Date.now()/1000||Number(expires)>Date.now()/1000+1210||!/^[0-9a-f]{64}$/.test(sig||''))return false;
  const {key,bytes}=await hmac(secret,`${id}:${viewer}:${expires}`);return crypto.subtle.verify('HMAC',key,Uint8Array.from(sig.match(/../g),h=>parseInt(h,16)),bytes);
 }
-// Adds a short-lived signed `src` to every media item under `photos` or `media` keys, at any depth.
+// Links expire at the end of the next 10-minute bucket (10–20 min from now). Within a bucket the URL is
+// identical, so the browser cache can reuse images instead of downloading them again on every page.
+export function mediaExpiry(now=Date.now()){return (Math.floor(now/1000/600)+2)*600;}
+// Adds a signed `src` (and `thumb` when a small preview exists) to every media item under `photos`/`media`, at any depth.
 export async function hydrate(data,viewer,origin,env){
  if(Array.isArray(data))return Promise.all(data.map(x=>hydrate(x,viewer,origin,env)));
  if(!data||typeof data!=='object')return data;
- const expires=Math.floor(Date.now()/1000)+600,out={};
+ const expires=mediaExpiry(),out={};
  for(const [k,v] of Object.entries(data)){
-  if((k==='photos'||k==='media')&&Array.isArray(v))out[k]=await Promise.all(v.map(async m=>m&&UUID.test(m.id||'')&&(!m.status||m.status==='ready')?{...m,src:`${origin}/media/${m.id}?viewer=${viewer}&expires=${expires}&sig=${await signMedia(env.MEDIA_SIGNING_SECRET,m.id,viewer,expires)}`}:m));
+  if((k==='photos'||k==='media')&&Array.isArray(v))out[k]=await Promise.all(v.map(async m=>{if(!(m&&UUID.test(m.id||'')&&(!m.status||m.status==='ready')))return m;const src=`${origin}/media/${m.id}?viewer=${viewer}&expires=${expires}&sig=${await signMedia(env.MEDIA_SIGNING_SECRET,m.id,viewer,expires)}`;return {...m,src,thumb:m.thumb===true?`${src}&size=thumb`:undefined};}));
   else out[k]=v&&typeof v==='object'?await hydrate(v,viewer,origin,env):v;
  }
  return out;
 }
 // ---------- Storage: Backblaze B2 private bucket via the S3-compatible API ----------
-// Object layout: users/<uid>/images/<id>.jpg · users/<uid>/videos/<id>.mp4 · site/hero/<id>.jpg
+// Object layout: users/<uid>/images/<id>.webp (+ <id>_t.webp preview) · users/<uid>/videos/<id>.mp4 · users/<uid>/chat/… · site/hero/… · site/login/…
 function b2URL(env,key){const base=new URL(b2Endpoint(env));if(base.protocol!=='https:'||!base.hostname.endsWith('.backblazeb2.com'))throw new HttpError(503,'Kho ảnh chưa sẵn sàng.');return `${base.origin}/${encodeURIComponent(env.B2_BUCKET)}/${key.split('/').map(encodeURIComponent).join('/')}`;}
 async function b2(env,key,method,body,headers={}){
  const client=new AwsClient({accessKeyId:env.B2_KEY_ID,secretAccessKey:env.B2_APPLICATION_KEY,region:b2Region(env),service:'s3'});
@@ -95,13 +98,17 @@ async function putObject(env,key,bytes,mime){
 async function deleteObject(env,m){
  if(!storageMode(env))return; // no storage yet: row stays 'deleting'; cron retries later
  const r=await b2(env,m.object_key,'DELETE');if(!r.ok&&r.status!==404)throw new HttpError(502,'Đang chờ xóa file khỏi kho ảnh. Hệ thống sẽ thử lại.');
+ if(m.thumb_key){const t=await b2(env,m.thumb_key,'DELETE');if(!t.ok&&t.status!==404)throw new HttpError(502,'Đang chờ xóa ảnh thu nhỏ. Hệ thống sẽ thử lại.');}
  await rpc(env,null,'cleanup_done',{id:m.id});
 }
-async function readFile(req,env,media){
+// cache: 'private' for member media (browser-only cache, URL already expires), 'public' for site images.
+async function readFile(req,env,media,{thumb=false,cache='private, max-age=600'}={}){
  const range=req.headers.get('range');if(range&&!/^bytes=\d*-\d*$/.test(range))throw new HttpError(416,'Range không hợp lệ.');
- const headers=new Headers({'content-type':media.mime,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline','accept-ranges':'bytes'});
+ const useThumb=thumb&&media.thumb_ready&&media.thumb_key;
+ // The database may require no caching (self-destructing chat media): it sends cache_control:'no-store'.
+ const headers=new Headers({'content-type':useThumb?media.thumb_mime:media.mime,'cache-control':media.cache_control==='no-store'?'no-store':cache,'x-content-type-options':'nosniff','content-disposition':'inline','accept-ranges':'bytes'});
  requireStorage(env);
- const upstream=await b2(env,media.object_key,'GET',undefined,range?{range}:{});
+ const upstream=await b2(env,useThumb?media.thumb_key:media.object_key,'GET',undefined,range?{range}:{});
  if(!upstream.ok)throw new HttpError(upstream.status===416?416:404,'Không tìm thấy ảnh/video.');
  for(const key of ['content-length','content-range'])if(upstream.headers.has(key))headers.set(key,upstream.headers.get(key));
  return new Response(upstream.body,{status:upstream.status,headers});
@@ -137,11 +144,11 @@ async function handle(req,env){
  if(req.method==='GET'&&path==='/hero'){
   const hero=await rpc(env,null,'hero');return json({...hero,src:hero.mediaId&&storageMode(env)?`${url.origin}/hero/${hero.mediaId}`:null});
  }
- if(req.method==='GET'&&path.startsWith('/hero/')){const id=path.slice(6);if(!UUID.test(id))throw new HttpError(404,'Không tìm thấy ảnh.');return readFile(req,env,await rpc(env,null,'hero_file',{id}));}
+ if(req.method==='GET'&&path.startsWith('/hero/')){const id=path.slice(6);if(!UUID.test(id))throw new HttpError(404,'Không tìm thấy ảnh.');return readFile(req,env,await rpc(env,null,'hero_file',{id}),{cache:'public, max-age=86400'});}
  if(req.method==='GET'&&path.startsWith('/media/')){
   const id=path.slice(7),viewer=url.searchParams.get('viewer'),expires=url.searchParams.get('expires'),sig=url.searchParams.get('sig');
   if(!await verifyMedia(env.MEDIA_SIGNING_SECRET,id,viewer,expires,sig))throw new HttpError(403,'Liên kết ảnh hết hạn. Hãy tải lại hồ sơ.');
-  return readFile(req,env,await rpc(env,viewer,'media_file',{id}));
+  return readFile(req,env,await rpc(env,viewer,'media_file',{id}),{thumb:url.searchParams.get('size')==='thumb'});
  }
  const user=await actor(req,env);
  if(req.method==='POST'&&path==='/api'){
@@ -155,6 +162,15 @@ async function handle(req,env){
  if(req.method==='POST'&&path==='/uploads'){
   requireStorage(env);
   const data=await jsonBody(req);const m=await rpc(env,user.id,'reserve_media',data);return json({id:m.id,uploadUrl:`${url.origin}/uploads/${m.id}`});
+ }
+ if(req.method==='PUT'&&/^\/uploads\/[0-9a-f-]{36}\/thumb$/i.test(path)){
+  const id=path.slice(9,45);if(!UUID.test(id))throw new HttpError(400,'File không hợp lệ.');
+  requireStorage(env);
+  const m=await rpc(env,user.id,'claim_thumb',{id});
+  const bytes=await boundedBody(req,m.thumb_bytes);
+  if(bytes.byteLength!==m.thumb_bytes||sniffMime(bytes)!==m.thumb_mime)throw new HttpError(415,'Ảnh thu nhỏ không khớp định dạng.');
+  await putObject(env,m.thumb_key,bytes,m.thumb_mime);
+  await rpc(env,user.id,'finish_thumb',{id});return json({id,thumb:true});
  }
  if(req.method==='PUT'&&path.startsWith('/uploads/')){
   const id=path.slice(9);if(!UUID.test(id))throw new HttpError(400,'File không hợp lệ.');

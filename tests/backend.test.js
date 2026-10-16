@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import worker,{boundedBody,sniffMime,signMedia,verifyMedia,allowedOrigin,hydrate,storageMode,deviceLabel,b2Endpoint,clientAction} from '../worker/index.js';
+import worker,{boundedBody,sniffMime,signMedia,verifyMedia,allowedOrigin,hydrate,storageMode,deviceLabel,b2Endpoint,clientAction,mediaExpiry} from '../worker/index.js';
 const uid='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',third='33333333-3333-4333-8333-333333333333',adminId='44444444-4444-4444-8444-444444444444';
 test('database authorization, album limits, nearby privacy and ownership',async()=>{
  const db=new PGlite();
@@ -32,6 +32,15 @@ test('database authorization, album limits, nearby privacy and ownership',async(
   await rpc(id,'claim_media',{id:m.id});await rpc(id,'finish_media',{id:m.id});return m;
  };
  const first=await add(uid);await add(other);await add(third);
+ // Thumbnail: reserved with the image, stored next to it, flagged ready after its own upload
+ const tm=await rpc(other,'reserve_media',{kind:'image',bytes:15,mime:'image/webp',thumbBytes:9,thumbMime:'image/webp'});
+ assert.equal(tm.thumb_key,`users/${other}/images/${tm.id}_t.webp`);
+ await assert.rejects(()=>rpc(other,'claim_thumb',{id:tm.id}),/không hợp lệ/);
+ await rpc(other,'claim_media',{id:tm.id});await rpc(other,'finish_media',{id:tm.id});
+ await assert.rejects(()=>rpc(uid,'claim_thumb',{id:tm.id}),/không hợp lệ/);
+ assert.equal((await rpc(other,'claim_thumb',{id:tm.id})).thumb_bytes,9);await rpc(other,'finish_thumb',{id:tm.id});
+ assert.equal((await rpc(other,'me')).photos.find(p=>p.id===tm.id).thumb,true);
+ await rpc(other,'delete_media',{id:tm.id});await rpc(null,'cleanup_done',{id:tm.id});
  assert.match(first.object_key,new RegExp(`^users/${uid}/images/${first.id}\\.jpg$`));
  assert.equal((await rpc(uid,'me')).complete,true);
  for(let i=1;i<10;i++)await add(uid);
@@ -64,6 +73,25 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  assert.equal((await rpc(other,'media_file',{id:cm.id})).id,cm.id);
  await assert.rejects(()=>rpc(third,'media_file',{id:cm.id}),/Không tìm/);
  assert.equal((await rpc(uid,'me')).photos.length,12);
+ // Self-destructing chat media: hidden until the recipient opens it, countdown from first view, sender never sees it
+ const em=await rpc(uid,'reserve_media',{kind:'image',purpose:'chat',bytes:15,mime:'image/jpeg'});await rpc(uid,'claim_media',{id:em.id});await rpc(uid,'finish_media',{id:em.id});
+ await assert.rejects(()=>rpc(uid,'send',{id:other,text:'x',ephemeral:'60'}),/Chỉ ảnh/);
+ await assert.rejects(()=>rpc(uid,'send',{id:other,mediaId:em.id,ephemeral:'7'}),/không hợp lệ/);
+ await rpc(uid,'send',{id:other,mediaId:em.id,ephemeral:'60'});
+ let eph=(await rpc(other,'messages',{id:uid})).find(m=>m.ephemeral===60);
+ assert.equal(eph.media.length,0);assert.equal(eph.viewedAt,null);
+ await assert.rejects(()=>rpc(other,'media_file',{id:em.id}),/Không tìm/);
+ await assert.rejects(()=>rpc(third,'open_ephemeral',{id:eph.id}),/Không tìm/);
+ const opened=await rpc(other,'open_ephemeral',{id:eph.id});assert.equal(opened.media[0].id,em.id);assert.ok(opened.expiresAt);
+ const mf=await rpc(other,'media_file',{id:em.id});assert.equal(mf.cache_control,'no-store');
+ await assert.rejects(()=>rpc(uid,'media_file',{id:em.id}),/Không tìm/);
+ assert.equal((await rpc(uid,'messages',{id:other})).find(m=>m.id===eph.id).media.length,0);
+ await db.exec('reset role');await db.query("update public.cd_messages set expires_at=now()-interval '1 second' where id=$1",[eph.id]);await db.exec('set role service_role');
+ await assert.rejects(()=>rpc(other,'media_file',{id:em.id}),/Không tìm/);
+ await assert.rejects(()=>rpc(other,'open_ephemeral',{id:eph.id}),/tự hủy/);
+ assert.ok((await rpc(null,'cleanup_list')).some(r=>r.id===em.id));
+ await rpc(null,'cleanup_done',{id:em.id});
+ eph=(await rpc(other,'messages',{id:uid})).find(m=>m.id===eph.id);assert.equal(eph.expired,true);
  // Thả thính: admin-written lines, sent as kind='tease'; free text cannot be passed off as a teaser
  const teasers=await rpc(uid,'teasers');assert.ok(teasers.length>=5);
  await rpc(uid,'send',{id:other,teaserId:teasers[0].id,text:'ignored'});
@@ -72,7 +100,7 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  // Worldwide free-text region, accent-insensitive contains match
  assert.equal((await rpc(uid,'discover',{city:'ha noi'})).length,2);
  assert.equal((await rpc(uid,'discover',{city:'Bangkok'})).length,0);
- assert.equal((await rpc(other,'messages',{id:uid})).length,3);
+ assert.equal((await rpc(other,'messages',{id:uid})).length,4);
  assert.equal((await rpc(third,'messages',{id:uid})).length,0);
  await rpc(other,'block',{id:uid});
  await assert.rejects(async()=>rpc(uid,'media_file',{id:(await rpc(other,'me')).photos[0].id}),/Không tìm/);
@@ -94,7 +122,7 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  assert.equal((await rpc(uid,'me')).appInstalled,false);await rpc(uid,'app_installed',{_geo:{country:'VN'}});assert.equal((await rpc(uid,'me')).appInstalled,true);
  assert.match((await rpc(uid,'reserve_media',{kind:'video',bytes:15,mime:'video/webm'}).catch(e=>({object_key:e.message}))).object_key,/giới hạn|^users\/.+\/videos\/.+\.webm$/);
  const stats=await rpc(adminId,'admin_stats');
- assert.equal(stats.totals.users,4);assert.equal(stats.totals.installed,1);assert.equal(stats.totals.messages,3);assert.equal(stats.totals.teases,1);assert.equal(stats.totals.chatMedia,1);assert.equal(stats.signups.length,30);
+ assert.equal(stats.totals.users,4);assert.equal(stats.totals.installed,1);assert.equal(stats.totals.messages,4);assert.equal(stats.totals.teases,1);assert.equal(stats.totals.chatMedia,1);assert.equal(stats.signups.length,30);
  assert.ok(stats.geoCity.some(x=>x.label==='Hanoi'));
  const users=await rpc(adminId,'admin_users',{query:'b@example'});
  assert.equal(users.length,1);assert.equal(users[0].email,'b@example.test');
@@ -175,6 +203,9 @@ test('worker helpers: nested media signing, optional storage, device label',asyn
  const out=await hydrate({profile:{photos:[{id:uid,kind:'image'}]},media:[{id:other,status:'pending'}]},third,'https://api.test',env);
  assert.match(out.profile.photos[0].src,/^https:\/\/api\.test\/media\//);
  assert.equal(out.media[0].src,undefined);
+ const th=await hydrate({photos:[{id:uid,kind:'image',thumb:true}]},third,'https://api.test',env);assert.match(th.photos[0].thumb,/&size=thumb$/);
+ const t0=Date.UTC(2026,9,16,12,3,0);assert.equal(mediaExpiry(t0),mediaExpiry(t0+5*60*1000));assert.ok(mediaExpiry(t0)-t0/1000>=600);
+ assert.equal(clientAction('claim_thumb'),false);
  assert.equal(clientAction('teasers'),true);assert.equal(clientAction('admin_teaser_save'),true);for(const a of ['media_file','admin_audit_add','claim_media','cleanup_done','hero_file','x;drop'])assert.equal(clientAction(a),false);
  assert.equal(storageMode({}),'');assert.equal(storageMode({B2_BUCKET:'b',B2_REGION:'us-west-004',B2_KEY_ID:'k',B2_APPLICATION_KEY:'s'}),'b2');assert.equal(b2Endpoint({B2_REGION:'us-west-004'}),'https://s3.us-west-004.backblazeb2.com');assert.equal(b2Endpoint({B2_REGION:'s3.ca-east-006.backblazeb2.com'}),'https://s3.ca-east-006.backblazeb2.com');assert.equal(b2Endpoint({B2_REGION:'https://s3.ca-east-006.backblazeb2.com/'}),'https://s3.ca-east-006.backblazeb2.com');
  assert.equal(deviceLabel('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit Version/17 Mobile Safari/604.1'),'iOS · Safari');
@@ -216,12 +247,66 @@ test('upgrade-v0.6.sql upgrades a live v0.5 database without losing data',async(
   await db.exec('reset role');
   await db.exec(await readFile(new URL('../supabase/upgrade-v0.6.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/upgrade-v0.6.sql',import.meta.url),'utf8')); // re-runnable
-  for(const v of ['0.7','0.7','0.8','0.8'])await db.exec(await readFile(new URL(`../supabase/upgrade-v${v}.sql`,import.meta.url),'utf8'));
+  for(const v of ['0.7','0.7','0.8','0.8','0.9','0.9','0.10','0.10'])await db.exec(await readFile(new URL(`../supabase/upgrade-v${v}.sql`,import.meta.url),'utf8'));
   await db.exec('set role service_role');
   assert.equal((await rpc(uid,'me')).name,'Anh A');
   assert.equal((await rpc(uid,'teasers')).length,6);
   assert.equal((await rpc(null,'hero')).loginMode,'slide');assert.equal((await rpc(null,'hero')).theme,'navy_coral');
   await db.exec('reset role;set role anon');
   await assert.rejects(()=>db.query('select * from public.cd_teasers'),/permission denied/);
+ }finally{await db.close();}
+});
+test('thumbnail upload goes to B2 next to the original and is served with ?size=thumb',async()=>{
+ const mediaId='66666666-6666-4666-8666-666666666666',key=`users/${uid}/images/${mediaId}.webp`,tkey=`users/${uid}/images/${mediaId}_t.webp`;
+ const webp=new TextEncoder().encode('RIFF\0\0\0\0WEBPVP8 xx');
+ const env={SUPABASE_URL:'https://db.test',SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x',MEDIA_SIGNING_SECRET:'a-secure-test-secret-32-characters',ALLOWED_ORIGINS:'https://app.test',B2_BUCKET:'b',B2_REGION:'us-west-004',B2_KEY_ID:'kid',B2_APPLICATION_KEY:'secret'};
+ const row={id:mediaId,object_key:key,mime:'image/webp',bytes:999,thumb_key:tkey,thumb_mime:'image/webp',thumb_bytes:webp.length,thumb_ready:true};
+ const calls=[];const real=globalThis.fetch;
+ globalThis.fetch=async(input,init={})=>{const req=input instanceof Request?input:new Request(input,init);calls.push(req);
+  if(req.url.endsWith('/auth/v1/user'))return Response.json({id:uid});
+  if(req.url.endsWith('/rpc/cd_api'))return Response.json(row);
+  if(req.url.includes('backblazeb2.com'))return new Response(req.method==='GET'?'img':null,{status:200});
+  throw new Error('unexpected '+req.url);};
+ try{
+  const r=await worker.fetch(new Request(`https://api.test/uploads/${mediaId}/thumb`,{method:'PUT',headers:{authorization:'Bearer t','content-type':'image/webp'},body:webp}),env);
+  assert.equal(r.status,200);assert.ok(calls.some(c=>c.method==='PUT'&&c.url.endsWith(tkey)));
+  const exp=mediaExpiry(),sig=await signMedia(env.MEDIA_SIGNING_SECRET,mediaId,uid,exp);
+  const g=await worker.fetch(new Request(`https://api.test/media/${mediaId}?viewer=${uid}&expires=${exp}&sig=${sig}&size=thumb`),env);
+  assert.equal(g.status,200);assert.ok(calls.some(c=>c.method==='GET'&&c.url.endsWith(tkey)));
+  assert.equal(g.headers.get('cache-control'),'private, max-age=600');
+  row.cache_control='no-store';const g2=await worker.fetch(new Request(`https://api.test/media/${mediaId}?viewer=${uid}&expires=${exp}&sig=${sig}`),env);assert.equal(g2.headers.get('cache-control'),'no-store');
+ }finally{globalThis.fetch=real;}
+});
+
+test('account deletion queues B2 files; chat media retention',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+  create schema auth; create table auth.users(id uuid primary key,email text,raw_app_meta_data jsonb default '{}',created_at timestamptz default now(),last_sign_in_at timestamptz,email_confirmed_at timestamptz default now());grant usage on schema auth to service_role;
+  insert into auth.users(id,email) values ('${uid}','a@example.test'),('${other}','b@example.test'),('${adminId}','vinnielx@gmail.com');`);
+  await db.exec(await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8'));
+  await db.exec('set role service_role');
+  const rpc=async(actor,action,data={})=>(await db.query('select public.cd_api($1,$2,$3::jsonb) as value',[actor,action,JSON.stringify(data)])).rows[0].value;
+  const add=async(id,purpose='profile')=>{const m=await rpc(id,'reserve_media',{kind:'image',purpose,bytes:15,mime:'image/jpeg',thumbBytes:5,thumbMime:'image/jpeg'});await rpc(id,'claim_media',{id:m.id});await rpc(id,'finish_media',{id:m.id});return m;};
+  for(const id of [uid,other]){await rpc(id,'accept_adult');await rpc(id,'profile_save',{name:'Anh A',age:30,city:'Hà Nội',intent:'x',bio:'Mình thích những câu chuyện chân thành.'});}
+  const pm=await add(uid);await add(other);
+  // Retention: chat media older than N days becomes due; message text stays
+  const cm=await add(uid,'chat');await rpc(uid,'send',{id:other,mediaId:cm.id,text:'ảnh cũ'});
+  await db.exec('reset role');await db.query("update public.cd_media set created_at=now()-interval '40 days' where id=$1",[cm.id]);await db.exec('set role service_role');
+  assert.equal((await rpc(null,'cleanup_list')).some(r=>r.id===cm.id),false);
+  await rpc(adminId,'admin_chat_retention',{days:30});assert.equal((await rpc(adminId,'admin_slides')).chatDays,30);
+  assert.ok((await rpc(null,'cleanup_list')).some(r=>r.id===cm.id));
+  await rpc(null,'cleanup_done',{id:cm.id});
+  assert.equal((await rpc(other,'messages',{id:uid}))[0].body,'ảnh cũ');
+  // normal cleanup must not re-queue files into the trash
+  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from chich_private.storage_trash')).rows[0].n,0);
+  // Deleting the auth user cascades rows away -> keys land in storage_trash -> cron deletes them
+  await db.query('delete from auth.users where id=$1',[uid]);
+  const trash=(await db.query('select * from chich_private.storage_trash')).rows;
+  assert.ok(trash.some(r=>r.object_key===pm.object_key&&r.thumb_key===pm.thumb_key));
+  await db.exec('set role service_role');
+  const list=await rpc(null,'cleanup_list');const tr=list.find(r=>r.object_key===pm.object_key);assert.ok(tr);
+  await rpc(null,'cleanup_done',{id:tr.id});
+  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from chich_private.storage_trash')).rows[0].n,0);
  }finally{await db.close();}
 });

@@ -5,7 +5,7 @@ drop function if exists public.cd_api(uuid,text,jsonb);
 drop function if exists public.cd_feedback_submit(text,text);
 drop table if exists public.cd_feedback, public.cd_teasers, public.cd_reports, public.cd_messages, public.cd_blocks, public.cd_likes, public.cd_settings, public.cd_media, public.cd_profiles cascade;
 drop schema if exists chich_private cascade;
--- CHI.CH DAO. v0.8. Run once on a dedicated Supabase project.
+-- CHI.CH DAO. v0.10. Run once on a dedicated Supabase project.
 -- Browser roles intentionally have NO table/RPC access. The Worker validates
 -- Supabase access tokens with /auth/v1/user, then calls this service-only API.
 create schema if not exists chich_private;
@@ -66,6 +66,9 @@ create table public.cd_media (
  mime text not null check(mime in ('image/jpeg','image/png','image/webp','video/mp4','video/webm')),
  bytes integer not null check(bytes>0 and bytes<=20971520),
  object_key text not null unique,
+ -- Optional small preview (~480 px) stored next to the original on B2; cards/lists use it, full image opens on tap.
+ thumb_key text not null default '', thumb_mime text not null default '' check(thumb_mime in ('','image/jpeg','image/webp')),
+ thumb_bytes integer not null default 0 check(thumb_bytes between 0 and 307200), thumb_ready boolean not null default false,
  status text not null default 'pending' check(status in ('pending','uploading','ready','deleting')),
  caption text not null default '' check(length(caption)<=120),
  position integer not null default 0,
@@ -79,6 +82,8 @@ create table public.cd_settings (
  -- Signed-out page: admin images on the right side, as a single image or a slideshow.
  login_mode text not null default 'slide' check(login_mode in ('single','slide')),
  login_interval integer not null default 6 check(login_interval between 3 and 30),
+ -- Auto-delete chat photos/videos older than N days (0 = keep forever). Message text is kept.
+ chat_media_days integer not null default 0 check(chat_media_days between 0 and 3650),
  -- Site colour theme, chosen by the admin (brand guideline schemes + navy/coral).
  theme text not null default 'navy_coral' check(theme in ('navy_coral','navy_orange','black_red','charcoal_gold','forest_cream','cobalt_lime','cream_burgundy'))
 );
@@ -100,6 +105,9 @@ create table public.cd_messages (
  recipient_id uuid not null references public.cd_profiles(id) on delete cascade,
  body text not null default '' check(length(body)<=1000),
  media_id uuid unique references public.cd_media(id) on delete set null,
+ -- Self-destructing attachment: 0 = normal. Countdown starts when the recipient opens it; unopened ones vanish after 24h.
+ ephemeral_seconds integer not null default 0 check(ephemeral_seconds in (0,60,300,600,3600)),
+ viewed_at timestamptz, expires_at timestamptz,
  kind text not null default 'text' check(kind in ('text','tease')),
  created_at timestamptz not null default now(), check(sender_id<>recipient_id)
 );
@@ -143,6 +151,9 @@ create table public.cd_feedback (
 create index cd_feedback_time on public.cd_feedback(created_at desc);
 create index cd_feedback_client on public.cd_feedback(client_hash,created_at desc);
 create index cd_feedback_ip on public.cd_feedback(ip_hash,created_at desc);
+-- B2 objects whose DB rows vanished outside the normal cleanup (e.g. an account deleted in Supabase Auth cascades
+-- through cd_media). The cron job deletes these files from B2.
+create table chich_private.storage_trash (id uuid primary key default gen_random_uuid(), object_key text not null, thumb_key text not null default '', created_at timestamptz not null default now());
 create table chich_private.secrets (id boolean primary key default true check(id), feedback_salt text not null default md5(random()::text||clock_timestamp()::text));
 insert into chich_private.secrets(id) values(true);
 create table chich_private.locations (
@@ -169,6 +180,7 @@ alter table public.cd_reports enable row level security;
 alter table public.cd_teasers enable row level security;
 alter table public.cd_feedback enable row level security;
 alter table chich_private.secrets enable row level security;
+alter table chich_private.storage_trash enable row level security;
 alter table chich_private.accounts enable row level security;
 alter table chich_private.locations enable row level security;
 alter table chich_private.rate_limits enable row level security;
@@ -217,7 +229,7 @@ create function chich_private.profile_json(p public.cd_profiles) returns jsonb
 language sql stable security invoker set search_path='' as $$
  select jsonb_build_object('id',p.id,'name',p.name,'age',p.age,'city',p.city,'occupation',p.occupation,
  'bodyType',p.body_type,'lifestyle',p.lifestyle,'training',p.training,'intent',p.intent,'bio',p.bio,'visible',p.visible,
- 'complete',chich_private.complete(p),'photos',coalesce((select jsonb_agg(jsonb_build_object('id',m.id,'kind',m.kind,'caption',m.caption,'position',m.position) order by m.position,m.created_at)
+ 'complete',chich_private.complete(p),'photos',coalesce((select jsonb_agg(jsonb_build_object('id',m.id,'kind',m.kind,'caption',m.caption,'position',m.position,'thumb',m.thumb_ready) order by m.position,m.created_at)
  from public.cd_media m where m.user_id=p.id and m.purpose='profile' and m.status='ready'),'[]'::jsonb))
 $$;
 create function chich_private.throttle(actor uuid, label text, max_hits integer, seconds integer) returns void
@@ -275,10 +287,47 @@ begin
  return jsonb_build_object('ok',true);
 end $$;
 
+
+-- Media rows whose files must be removed from B2 now.
+create function chich_private.media_due() returns setof public.cd_media
+language sql stable security invoker set search_path='' as $$
+ select md.* from public.cd_media md where
+  (md.status in ('pending','uploading') and md.created_at<now()-interval '1 hour')
+  or md.status='deleting'
+  or (md.purpose='chat' and md.status='ready' and md.created_at<now()-interval '24 hours' and not exists(select 1 from public.cd_messages mm where mm.media_id=md.id))
+  or (md.purpose='chat' and md.status='ready' and exists(select 1 from public.cd_messages mm where mm.media_id=md.id and mm.ephemeral_seconds>0
+       and ((mm.expires_at is not null and mm.expires_at<now()) or (mm.viewed_at is null and mm.created_at<now()-interval '24 hours'))))
+  or (md.purpose='chat' and md.status='ready' and (select chat_media_days from public.cd_settings where id)>0
+       and md.created_at<now()-make_interval(days=>(select chat_media_days from public.cd_settings where id)))
+$$;
+-- Remember B2 keys when media rows disappear outside cleanup_done (account deletion cascades etc.).
+create function chich_private.media_trash() returns trigger
+language plpgsql security definer set search_path='' as $$
+begin
+ if coalesce(current_setting('chich.cleanup',true),'')<>'1' and old.status in ('ready','uploading','deleting') then
+  insert into chich_private.storage_trash(object_key,thumb_key) values(old.object_key,old.thumb_key);
+ end if;
+ return old;
+end $$;
+create trigger cd_media_trash after delete on public.cd_media for each row execute function chich_private.media_trash();
+
+
+-- One chat message as JSON for a viewer. Self-destructing media is only included for the recipient while it is open.
+create function chich_private.message_json(mm public.cd_messages, viewer uuid, as_admin boolean) returns jsonb
+language sql stable security invoker set search_path='' as $$
+ select jsonb_build_object('id',mm.id,'sender_id',mm.sender_id,'recipient_id',mm.recipient_id,'body',mm.body,'kind',mm.kind,'created_at',mm.created_at,
+  'ephemeral',mm.ephemeral_seconds,'viewedAt',mm.viewed_at,'expiresAt',mm.expires_at,
+  'expired',mm.ephemeral_seconds>0 and (mm.media_id is null or (mm.expires_at is not null and mm.expires_at<=now()) or (mm.viewed_at is null and mm.created_at<now()-interval '24 hours')),
+  'media',case when md.id is null then '[]'::jsonb
+   when mm.ephemeral_seconds>0 and not as_admin and not coalesce(mm.recipient_id=viewer and mm.expires_at>now(),false) then '[]'::jsonb
+   else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes,'thumb',md.thumb_ready and mm.ephemeral_seconds=0)) end)
+ from (select 1) one left join public.cd_media md on md.id=mm.media_id and md.status='ready'
+$$;
+
 -- Sole service API. p_actor MUST come from verified Auth user, never request JSON.
 create function public.cd_api(p_actor uuid, p_action text, p_data jsonb default '{}') returns jsonb
 language plpgsql security invoker set search_path='' as $$
-declare p public.cd_profiles; m public.cd_media; result jsonb; target uuid; v_media uuid;
+declare p public.cd_profiles; m public.cd_media; v_msg public.cd_messages; result jsonb; target uuid; v_media uuid;
  admin boolean; n integer; k text; v_purpose text; loc chich_private.locations; radius integer;
 begin
  if current_user<>'service_role' then raise exception 'Forbidden'; end if;
@@ -288,7 +337,9 @@ begin
    'slides',coalesce((select jsonb_agg(md.id order by md.position,md.created_at) from public.cd_media md where md.purpose='slide' and md.status='ready'),'[]'::jsonb)) from public.cd_settings s where id);
  end if;
  if p_action='cleanup_list' then
-  return coalesce((select jsonb_agg(to_jsonb(x)) from (select id,object_key from public.cd_media md where (status in ('pending','uploading') and created_at<now()-interval '1 hour') or status='deleting' or (purpose='chat' and status='ready' and created_at<now()-interval '24 hours' and not exists(select 1 from public.cd_messages mm where mm.media_id=md.id)) limit 100) x),'[]');
+  return coalesce((select jsonb_agg(to_jsonb(x)) from (
+   (select id,object_key,thumb_key from chich_private.media_due() limit 100)
+   union all (select id,object_key,thumb_key from chich_private.storage_trash order by created_at limit 100)) x),'[]');
  end if;
  if p_action='cleanup_expired' then
   delete from chich_private.locations where updated_at<now()-interval '24 hours';
@@ -297,7 +348,9 @@ begin
   return '{}';
  end if;
  if p_action='cleanup_done' then
-  delete from public.cd_media md where md.id=(p_data->>'id')::uuid and (md.status='deleting' or (md.status in ('pending','uploading') and md.created_at<now()-interval '1 hour') or (md.purpose='chat' and md.status='ready' and md.created_at<now()-interval '24 hours' and not exists(select 1 from public.cd_messages mm where mm.media_id=md.id)));
+  perform set_config('chich.cleanup','1',true);
+  delete from public.cd_media where id=(p_data->>'id')::uuid and id in (select d.id from chich_private.media_due() d);
+  delete from chich_private.storage_trash where id=(p_data->>'id')::uuid;
   delete from chich_private.locations where updated_at<now()-interval '24 hours';
   return '{}';
  end if;
@@ -402,10 +455,21 @@ begin
   insert into public.cd_media(id,user_id,kind,purpose,mime,bytes,object_key,position) values(v_media,p_actor,k,v_purpose,p_data->>'mime',(p_data->>'bytes')::int,
    -- B2 layout: site/hero/<id>.<ext> | users/<uid>/images|videos/<id>.<ext> | users/<uid>/chat/<id>.<ext>
    case when v_purpose='hero' then 'site/hero/' when v_purpose='slide' then 'site/login/' when v_purpose='chat' then 'users/'||p_actor::text||'/chat/' else 'users/'||p_actor::text||case when k='image' then '/images/' else '/videos/' end end||v_media::text||'.'||case p_data->>'mime' when 'image/jpeg' then 'jpg' when 'image/png' then 'png' when 'image/webp' then 'webp' when 'video/mp4' then 'mp4' else 'webm' end,n) returning * into m;
+  if k='image' and coalesce(p_data->>'thumbBytes','') ~ '^\d{1,6}$' and (p_data->>'thumbBytes')::int between 1 and 307200 and coalesce(p_data->>'thumbMime','') in ('image/jpeg','image/webp') then
+   update public.cd_media set thumb_bytes=(p_data->>'thumbBytes')::int,thumb_mime=p_data->>'thumbMime',
+    thumb_key=regexp_replace(object_key,'\.[a-z0-9]+$','')||'_t.'||case when p_data->>'thumbMime'='image/webp' then 'webp' else 'jpg' end
+   where id=v_media returning * into m;
+  end if;
   return to_jsonb(m);
  elsif p_action='claim_media' then
   update public.cd_media set status='uploading' where id=(p_data->>'id')::uuid and user_id=p_actor and status='pending' and created_at>now()-interval '15 minutes' returning * into m;
   if m.id is null then raise exception 'Lượt tải lên hết hạn hoặc đã sử dụng.'; end if; return to_jsonb(m);
+ elsif p_action='claim_thumb' then
+  select * into m from public.cd_media where id=(p_data->>'id')::uuid and user_id=p_actor and status='ready' and thumb_key<>'' and not thumb_ready and created_at>now()-interval '30 minutes';
+  if m.id is null then raise exception 'Ảnh thu nhỏ không hợp lệ.'; end if; return to_jsonb(m);
+ elsif p_action='finish_thumb' then
+  update public.cd_media set thumb_ready=true where id=(p_data->>'id')::uuid and user_id=p_actor and thumb_key<>'' returning * into m;
+  if m.id is null then raise exception 'Ảnh thu nhỏ không hợp lệ.'; end if; return jsonb_build_object('id',m.id);
  elsif p_action='finish_media' then
   update public.cd_media set status='ready' where id=(p_data->>'id')::uuid and user_id=p_actor and status='uploading' returning * into m;
   if m.id is null then raise exception 'Lượt tải lên không hợp lệ.'; end if; return jsonb_build_object('id',m.id);
@@ -432,8 +496,11 @@ begin
      m.purpose not in ('profile','chat')
      or (m.purpose='profile' and not chich_private.can_view(p_actor,m.user_id))
      -- chat attachment: only the sender, or the recipient of the message carrying it (and not blocked)
-     or (m.purpose='chat' and m.user_id<>p_actor and not exists(select 1 from public.cd_messages mm where mm.media_id=m.id and mm.recipient_id=p_actor and not chich_private.is_blocked(p_actor,mm.sender_id)))
-  )) then raise exception 'Không tìm thấy ảnh/video.'; end if; return to_jsonb(m);
+     or (m.purpose='chat' and not exists(select 1 from public.cd_messages mm where mm.media_id=m.id
+          and ((mm.ephemeral_seconds=0 and (mm.sender_id=p_actor or (mm.recipient_id=p_actor and not chich_private.is_blocked(p_actor,mm.sender_id))))
+            or (mm.ephemeral_seconds>0 and mm.recipient_id=p_actor and coalesce(mm.expires_at>now(),false) and not chich_private.is_blocked(p_actor,mm.sender_id)))))
+  )) then raise exception 'Không tìm thấy ảnh/video.'; end if;
+  return to_jsonb(m)||case when exists(select 1 from public.cd_messages mm where mm.media_id=m.id and mm.ephemeral_seconds>0) then jsonb_build_object('cache_control','no-store') else '{}'::jsonb end;
 
  -- ===================== Admin console (single admin by email) =====================
  elsif p_action like 'admin\_%' then
@@ -491,7 +558,7 @@ begin
     'auth',(select to_jsonb(u) from chich_private.auth_directory() u where u.id=target),
     'account',(select to_jsonb(a)-'user_id' from chich_private.accounts a where a.user_id=target),
     'profile',(select chich_private.profile_json(q)||jsonb_build_object('adultAcceptedAt',q.adult_accepted_at,'createdAt',q.created_at,'updatedAt',q.updated_at) from public.cd_profiles q where q.id=target),
-    'media',coalesce((select jsonb_agg(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes,'caption',md.caption,'status',md.status,'purpose',md.purpose,'createdAt',md.created_at) order by md.created_at desc) from public.cd_media md where md.user_id=target),'[]'),
+    'media',coalesce((select jsonb_agg(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes,'caption',md.caption,'status',md.status,'purpose',md.purpose,'createdAt',md.created_at,'thumb',md.thumb_ready) order by md.created_at desc) from public.cd_media md where md.user_id=target),'[]'),
     'nearby',(select jsonb_build_object('enabled',true,'updatedAt',l.updated_at) from chich_private.locations l where l.user_id=target and l.updated_at>now()-interval '24 hours'),
     'activity',coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (select id,event,target_id,country,region,city,device,created_at from chich_private.activity where user_id=target order by created_at desc limit 300) x),'[]'),
     'conversations',coalesce((select jsonb_agg(to_jsonb(x) order by x.last_at desc) from (
@@ -508,19 +575,18 @@ begin
    target=nullif(p_data->>'userId','')::uuid;
    return coalesce((select jsonb_agg(to_jsonb(x) order by x.last_at desc) from (
     select c.a,c.b,c.n,c.last_at,c.preview,pa.name a_name,pb.name b_name,chich_private.auth_email(c.a) a_email,chich_private.auth_email(c.b) b_email from (
-     select least(sender_id,recipient_id) a,greatest(sender_id,recipient_id) b,count(*) n,max(created_at) last_at,left((array_agg(case when cm.kind='tease' then '🔥 '||cm.body when cm.body='' and cm.media_id is not null then '[Ảnh/video]' else cm.body end order by cm.created_at desc))[1],140) preview
+     select least(sender_id,recipient_id) a,greatest(sender_id,recipient_id) b,count(*) n,max(created_at) last_at,left((array_agg(case when cm.kind='tease' then '🔥 '||cm.body when cm.ephemeral_seconds>0 and cm.body='' then '[Ảnh/video tự hủy]' when cm.body='' and cm.media_id is not null then '[Ảnh/video]' else cm.body end order by cm.created_at desc))[1],140) preview
      from public.cd_messages cm where target is null or target in (cm.sender_id,cm.recipient_id) group by 1,2) c
     join public.cd_profiles pa on pa.id=c.a join public.cd_profiles pb on pb.id=c.b
     order by c.last_at desc limit 50 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
   elsif p_action='admin_messages' then
    target=(p_data->>'a')::uuid;v_media=(p_data->>'b')::uuid;
    insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'view_chat',target,jsonb_build_object('with',v_media));
-   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.kind,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
-    from public.cd_messages mm left join public.cd_media md on md.id=mm.media_id and md.status='ready'
-    where (mm.sender_id=target and mm.recipient_id=v_media) or (mm.sender_id=v_media and mm.recipient_id=target) order by mm.created_at desc limit 1000) x),'[]');
+   return coalesce((select jsonb_agg(chich_private.message_json(mm,p_actor,true) order by mm.created_at) from (select * from public.cd_messages
+    where (sender_id=target and recipient_id=v_media) or (sender_id=v_media and recipient_id=target) order by created_at desc limit 1000) mm),'[]');
   elsif p_action='admin_media' then
    return jsonb_build_object('media',coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (
-    select md.id,md.user_id,md.kind,md.mime,md.bytes,md.caption,md.status,md.purpose,md.created_at,q.name owner_name,chich_private.auth_email(md.user_id) owner_email
+    select md.id,md.user_id,md.kind,md.mime,md.bytes,md.caption,md.status,md.purpose,md.created_at,md.thumb_ready thumb,q.name owner_name,chich_private.auth_email(md.user_id) owner_email
     from public.cd_media md join public.cd_profiles q on q.id=md.user_id
     where md.status='ready' and md.purpose in ('profile','chat') and (coalesce(p_data->>'kind','all')='all' or md.kind=p_data->>'kind') and (coalesce(p_data->>'purpose','all')='all' or md.purpose=p_data->>'purpose')
     order by md.created_at desc limit 60 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]'));
@@ -559,8 +625,12 @@ begin
   update public.cd_media set status='deleting' where purpose='hero' and id<>m.id;
   return '{}';
   elsif p_action='admin_slides' then
-   return (select jsonb_build_object('mode',s.login_mode,'interval',s.login_interval,
+   return (select jsonb_build_object('mode',s.login_mode,'interval',s.login_interval,'chatDays',s.chat_media_days,
     'slides',coalesce((select jsonb_agg(jsonb_build_object('id',md.id,'position',md.position,'bytes',md.bytes,'createdAt',md.created_at) order by md.position,md.created_at) from public.cd_media md where md.purpose='slide' and md.status='ready'),'[]'::jsonb)) from public.cd_settings s where id);
+  elsif p_action='admin_chat_retention' then
+   update public.cd_settings set chat_media_days=least(3650,greatest(0,coalesce((p_data->>'days')::int,0))) where id;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'chat_retention',jsonb_build_object('days',p_data->>'days'));
+   return '{}';
   elsif p_action='admin_slide_order' then
    update public.cd_media set position=coalesce((p_data->>'position')::int,position) where id=(p_data->>'id')::uuid and purpose='slide';
    return '{}';
@@ -633,7 +703,9 @@ begin
    v_media=nullif(p_data->>'mediaId','')::uuid;
    if v_media is not null and not exists(select 1 from public.cd_media where id=v_media and user_id=p_actor and purpose='chat' and status='ready') then raise exception 'Ảnh/video đính kèm không hợp lệ hoặc chưa tải xong.';end if;
    if coalesce(length(trim(p_data->>'text')),0)>1000 or (v_media is null and coalesce(length(trim(p_data->>'text')),0)=0) then raise exception 'Tin nhắn cần từ 1 đến 1000 ký tự.';end if;
-   insert into public.cd_messages(sender_id,recipient_id,body,media_id) values(p_actor,target,coalesce(trim(p_data->>'text'),''),v_media);
+   if coalesce(p_data->>'ephemeral','0') not in ('0','60','300','600','3600') then raise exception 'Thời gian tự hủy không hợp lệ.';end if;
+   if coalesce(p_data->>'ephemeral','0')<>'0' and v_media is null then raise exception 'Chỉ ảnh/video mới đặt được tự hủy.';end if;
+   insert into public.cd_messages(sender_id,recipient_id,body,media_id,ephemeral_seconds) values(p_actor,target,coalesce(trim(p_data->>'text'),''),v_media,coalesce(p_data->>'ephemeral','0')::int);
   end if; return '{}';
  elsif p_action='teasers' then
   return coalesce((select jsonb_agg(jsonb_build_object('id',t.id,'body',t.body) order by t.position,t.created_at) from public.cd_teasers t where t.active),'[]');
@@ -646,9 +718,16 @@ begin
  elsif p_action='messages' then
   target=(p_data->>'id')::uuid;
   if not chich_private.can_view(p_actor,target) then raise exception 'Cuộc trò chuyện không khả dụng.';end if;
-  return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.kind,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
-    from public.cd_messages mm left join public.cd_media md on md.id=mm.media_id and md.status='ready'
-    where (mm.sender_id=p_actor and mm.recipient_id=target) or (mm.sender_id=target and mm.recipient_id=p_actor) order by mm.created_at desc limit 100) x),'[]');
+  return coalesce((select jsonb_agg(chich_private.message_json(mm,p_actor,false) order by mm.created_at) from (select * from public.cd_messages
+    where (sender_id=p_actor and recipient_id=target) or (sender_id=target and recipient_id=p_actor) order by created_at desc limit 100) mm),'[]');
+ elsif p_action='open_ephemeral' then
+  select * into v_msg from public.cd_messages where id=(p_data->>'id')::uuid and recipient_id=p_actor and ephemeral_seconds>0;
+  if v_msg.id is null or chich_private.is_blocked(p_actor,v_msg.sender_id) then raise exception 'Không tìm thấy tin nhắn.'; end if;
+  if v_msg.media_id is null or (v_msg.expires_at is not null and v_msg.expires_at<=now()) or (v_msg.viewed_at is null and v_msg.created_at<now()-interval '24 hours') then raise exception 'Ảnh/video đã tự hủy.'; end if;
+  if v_msg.viewed_at is null then
+   update public.cd_messages set viewed_at=now(),expires_at=now()+make_interval(secs=>ephemeral_seconds) where id=v_msg.id returning * into v_msg;
+  end if;
+  return chich_private.message_json(v_msg,p_actor,false);
  end if;
  raise exception 'Unknown action';
 end $$;

@@ -1,26 +1,28 @@
 import {createClient} from '@supabase/supabase-js';
 export const config=window.CHICH_CONFIG||{};
 export const configured=!!(config.supabaseUrl&&config.supabaseKey&&config.apiUrl);
-export const supabase=configured?createClient(config.supabaseUrl,config.supabaseKey,{auth:{flowType:'pkce',detectSessionInUrl:true,persistSession:true,autoRefreshToken:true}}):null;
+// Auth/feedback only need Supabase; the Worker URL (apiUrl) is needed for everything else.
+export const authReady=!!(config.supabaseUrl&&config.supabaseKey);
+export const supabase=authReady?createClient(config.supabaseUrl,config.supabaseKey,{auth:{flowType:'pkce',detectSessionInUrl:true,persistSession:true,autoRefreshToken:true}}):null;
 async function token(){if(!supabase)throw new Error('Đăng nhập sẽ mở khi dịch vụ sẵn sàng.');const {data,error}=await supabase.auth.getSession();if(error)throw error;if(!data.session)throw new Error('Vui lòng đăng nhập.');return data.session.access_token;}
 async function result(response){const d=await response.json().catch(()=>({error:'Không kết nối được máy chủ API.'}));if(!response.ok)throw new Error(d.error||'Không thể xử lý yêu cầu.');return d;}
 export async function api(action,data={}){return result(await fetch(`${config.apiUrl}/api`,{method:'POST',headers:{authorization:`Bearer ${await token()}`,'content-type':'application/json'},body:JSON.stringify({action,data})}));}
 export async function hero(){if(!configured)return null;return result(await fetch(`${config.apiUrl}/hero`));}
-// Upload through the Worker (which pushes to Backblaze B2). onProgress(0..1) reports real upload progress.
-export async function upload(file,purpose='profile',onProgress){
+function putXHR(url,bearer,blob,onProgress){return new Promise((resolve,reject)=>{
+ const x=new XMLHttpRequest();x.open('PUT',url);x.setRequestHeader('authorization',`Bearer ${bearer}`);x.setRequestHeader('content-type',blob.type);
+ x.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(e.loaded/e.total);};
+ x.onload=()=>{let d={};try{d=JSON.parse(x.responseText);}catch{}if(x.status>=200&&x.status<300)resolve(d);else reject(new Error(d.error||'Không tải được file. Vui lòng thử lại.'));};
+ x.onerror=()=>reject(new Error('Mất kết nối khi tải file. Vui lòng thử lại.'));x.ontimeout=()=>reject(new Error('Tải file quá lâu. Vui lòng thử lại.'));x.timeout=180000;x.send(blob);});}
+// Upload through the Worker (which pushes to Backblaze B2). onProgress(0..1) reports real progress.
+// An optional small preview (thumb) is uploaded right after the main file; if it fails the full image is used instead.
+export async function upload(file,purpose='profile',onProgress,thumb){
  const auth={authorization:`Bearer ${await token()}`};
- const slot=await result(await fetch(`${config.apiUrl}/uploads`,{method:'POST',headers:{...auth,'content-type':'application/json'},body:JSON.stringify({kind:file.type.startsWith('video/')?'video':'image',mime:file.type,bytes:file.size,purpose})}));
- const bearer=await token();
- await new Promise((resolve,reject)=>{
-  const x=new XMLHttpRequest();x.open('PUT',slot.uploadUrl);
-  x.setRequestHeader('authorization',`Bearer ${bearer}`);x.setRequestHeader('content-type',file.type);
-  x.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(Math.min(.99,e.loaded/e.total));};
-  x.onload=()=>{let d={};try{d=JSON.parse(x.responseText);}catch{}if(x.status>=200&&x.status<300){onProgress?.(1);resolve(d);}else reject(new Error(d.error||'Không tải được file. Vui lòng thử lại.'));};
-  x.onerror=()=>reject(new Error('Mất kết nối khi tải file. Vui lòng thử lại.'));
-  x.ontimeout=()=>reject(new Error('Tải file quá lâu. Vui lòng thử lại.'));x.timeout=180000;
-  x.send(file);
- });
- return slot.id;
+ const meta={kind:file.type.startsWith('video/')?'video':'image',mime:file.type,bytes:file.size,purpose,...(thumb&&!file.type.startsWith('video/')?{thumbBytes:thumb.size,thumbMime:thumb.type}:{})};
+ const slot=await result(await fetch(`${config.apiUrl}/uploads`,{method:'POST',headers:{...auth,'content-type':'application/json'},body:JSON.stringify(meta)}));
+ const bearer=await token(),share=thumb?.95:1;
+ await putXHR(slot.uploadUrl,bearer,file,p=>onProgress?.(Math.min(.99,p*share)));
+ if(thumb&&meta.thumbBytes){try{await putXHR(`${slot.uploadUrl}/thumb`,bearer,thumb,p=>onProgress?.(Math.min(.99,share+p*(1-share))));}catch{}}
+ onProgress?.(1);return slot.id;
 }
 export async function removeMedia(id){return result(await fetch(`${config.apiUrl}/media/${encodeURIComponent(id)}`,{method:'DELETE',headers:{authorization:`Bearer ${await token()}`}}));}
 export async function signIn(){if(!configured)throw new Error('Đăng nhập sẽ mở khi dịch vụ sẵn sàng.');const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname,queryParams:{prompt:'select_account'}}});if(error)throw error;}
@@ -30,4 +32,4 @@ export async function adminAuth(payload){return result(await fetch(`${config.api
 
 // Feedback goes straight to Supabase (cd_feedback_submit is the only browser-callable RPC; rate-limited server side).
 function clientId(){try{let id=localStorage.getItem('chich.client');if(!id){id=crypto.randomUUID();localStorage.setItem('chich.client',id);}return id;}catch{return '';}}
-export async function sendFeedback(body){if(!configured)throw new Error('Dịch vụ chưa sẵn sàng.');const {error}=await supabase.rpc('cd_feedback_submit',{p_body:String(body||'').trim(),p_client:clientId()});if(error)throw new Error(error.message||'Chưa gửi được góp ý.');}
+export async function sendFeedback(body){if(!supabase)throw new Error('Thiếu cấu hình Supabase trong config.js.');const {error}=await supabase.rpc('cd_feedback_submit',{p_body:String(body||'').trim(),p_client:clientId()});if(error)throw new Error(error.message||'Chưa gửi được góp ý.');}

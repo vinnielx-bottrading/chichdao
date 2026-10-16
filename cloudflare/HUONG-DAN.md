@@ -92,7 +92,7 @@ npx wrangler secret put MEDIA_SIGNING_SECRET --config cloudflare/wrangler.toml
 
 `B2_ENDPOINT` là tùy chọn — chỉ cần khi endpoint khác dạng `https://s3.<B2_REGION>.backblazeb2.com`.
 
-Kiểm tra: mở `https://chich-dao-api.<tài-khoản>.workers.dev/health`
+Kiểm tra: mở `https://chichdao.vinnielx.workers.dev/health`
 - `{"ready":true,"storage":"b2"}` → đủ cấu hình.
 - `"storage":"none"` → thiếu 1 trong 4 biến B2 (API vẫn chạy, tải ảnh báo chưa cấu hình).
 - `"ready":false` → thiếu biến Supabase hoặc biến ứng dụng.
@@ -103,6 +103,6 @@ Kiểm tra: mở `https://chich-dao-api.<tài-khoản>.workers.dev/health`
 |---|---|---|
 | `supabaseUrl` | `https://oignkueulvvdfhgcvguv.supabase.co` | Đăng nhập Google/email (Supabase Auth) |
 | `supabaseKey` | `sb_publishable_fPydS416joWqg53YBGFFsQ_CtbiMCEh` | Khóa công khai cho đăng nhập; không đọc được database (mọi bảng đã khóa với trình duyệt) |
-| `apiUrl` | `https://chich-dao-api.<tài-khoản>.workers.dev` | Gọi Worker; không `/` cuối |
+| `apiUrl` | `https://chichdao.vinnielx.workers.dev` | Gọi Worker; không `/` cuối |
 
 Sửa `config.js` xong commit lên GitHub để Vercel deploy lại.
