@@ -814,7 +814,12 @@ begin
  elsif p_action='blocked' then
   return coalesce((select jsonb_agg(jsonb_build_object('id',q.id,'name',q.name)) from public.cd_profiles q join public.cd_blocks b on b.target_id=q.id where b.user_id=p_actor),'[]');
  elsif p_action='contacts' then
-  return coalesce((select jsonb_agg(chich_private.profile_json(q)) from public.cd_profiles q where q.id<>p_actor and chich_private.can_view(p_actor,q.id) and exists(select 1 from public.cd_messages mm where (mm.sender_id=p_actor and mm.recipient_id=q.id) or (mm.recipient_id=p_actor and mm.sender_id=q.id))),'[]');
+  -- Conversations, newest first, with a one-line preview of the last message.
+  return coalesce((select jsonb_agg(x.j order by x.last_at desc) from (
+   select chich_private.profile_json(q)||jsonb_build_object('lastAt',lm.created_at,'lastMine',lm.sender_id=p_actor,
+    'preview',case when lm.kind='tease' then '🔥 '||left(lm.body,80) when lm.media_id is not null and lm.body='' then '📷 Ảnh/video' when lm.ephemeral_seconds>0 and lm.body='' then '⏱ Ảnh/video tự hủy' else left(lm.body,80) end) j,lm.created_at last_at
+   from public.cd_profiles q cross join lateral (select * from public.cd_messages mm where (mm.sender_id=p_actor and mm.recipient_id=q.id) or (mm.recipient_id=p_actor and mm.sender_id=q.id) order by mm.created_at desc limit 1) lm
+   where q.id<>p_actor and chich_private.can_view(p_actor,q.id)) x),'[]');
  elsif p_action='messages' then
   target=(p_data->>'id')::uuid;
   if not chich_private.can_view(p_actor,target) then raise exception 'Cuộc trò chuyện không khả dụng.';end if;

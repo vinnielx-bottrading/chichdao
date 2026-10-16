@@ -15,3 +15,12 @@ self.addEventListener('fetch',e=>{
  // Images and fonts: stale-while-revalidate.
  e.respondWith(caches.open(VERSION).then(async c=>{const hit=await c.match(req);const net=fetch(req).then(r=>{if(r.ok)c.put(req,r.clone());return r;}).catch(()=>hit);return hit||net;}));
 });
+// Tapping a chat notification focuses the app (or opens it) and pops that conversation up.
+self.addEventListener('notificationclick',e=>{
+ e.notification.close();const chat=e.notification.data?.chat;
+ e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{
+  const c=list.find(x=>new URL(x.url).origin===location.origin);
+  if(c){c.postMessage({openChat:chat});return c.focus();}
+  return self.clients.openWindow(chat?`./?chat=${encodeURIComponent(chat)}#messages`:'./#messages');
+ }));
+});

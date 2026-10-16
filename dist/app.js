@@ -13,7 +13,7 @@ const defaults=()=>({city:'',occupation:'all',intent:'all',bodyType:'all',traini
 let samples=[],filters=defaults(),filterOpen=false,route='discover',me=null,session=null,items=[],contacts=[],blocked=[],chatId='',heroData=null,toastTimer,searchTimer,requestId=0,renderId=0,authRunning=false,lastAuthToken='',busy=false,gallery=[],galleryIndex=0;
 const cache=new Map();
 let pendingRoute='',installPrompt=null,chatFile=null,chatMessages=[],booting=false,uploads=[],teasers=null,bannerHidden=false;
-const dock={id:'',messages:[],timer:0,file:null,tray:false,eph:0};let chatEph=0;
+let chatEph=0;
 // Live chat: open conversations poll every 4 s; the inbox (unread badges + new-message notices) every 10 s.
 const msgSig=l=>(l||[]).map(m=>`${m.id}:${m.viewedAt||''}:${m.media?.length||0}:${m.expired?1:0}`).join('|');
 let inbox={unread:0,threads:[]},inboxSeen={},inboxFirst=true,chatSig='';
@@ -49,16 +49,17 @@ function mediaElement(m,controls=false){return m.kind==='video'?`<video src="${s
 function albumManager(){const list=me.photos||[],count=list.filter(x=>x.kind==='image').length,videos=list.length-count;return `<div class="heading-row"><div><span class="eyebrow">MỘT GÓC ĐỜI THƯỜNG</span><h2>Ảnh & video của tôi</h2><p>${count}/10 ảnh · ${videos}/2 video</p></div><button class="button secondary" data-action="preview-self">Xem hồ sơ ↗</button></div><div class="own-photo-grid">${list.map(m=>`<article class="own-photo"><button class="own-photo-view" data-gallery-owner="self" data-media="${m.id}">${mediaElement(m)}${m.src===photo(me)?'<span class="cover-badge">Ảnh đại diện</span>':''}</button><form data-caption-form="${m.id}"><label for="caption-${m.id}">Chú thích</label><input id="caption-${m.id}" name="caption" maxlength="120" value="${esc(m.caption)}"><button class="text-button">Lưu chú thích</button></form><div class="photo-actions">${m.kind==='image'?`<button data-cover="${m.id}">Đặt đại diện</button>`:''}<button data-delete="${m.id}">Xóa</button></div></article>`).join('')}${uploads.map(uploadTile).join('')}<button class="upload-tile" data-action="upload" ${busy?'disabled':''}><span>＋</span><b>${busy?'Đang tải lên…':'Thêm ảnh hoặc video'}</b><small>${busy?'Vui lòng giữ trang mở':'10 ảnh · 2 video'}</small></button></div><input id="media-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm" multiple hidden><p class="fine-print" style="margin-top:18px">Ảnh gốc tối đa 30 MB, app tự nén còn vài trăm KB mà vẫn nét. Video tối đa 20 MB (gợi ý: quay 720p để tải nhanh). Chỉ đăng nội dung của bạn hoặc nội dung bạn có quyền sử dụng. Ảnh đại diện phải là ảnh của bạn.</p>`;}
 function uploadTile(u){return `<article class="own-photo uploading" id="up-${u.key}"><div class="up-thumb">${u.preview?(u.video?`<video src="${u.preview}" muted playsinline></video>`:`<img src="${u.preview}" alt="">`):''}<div class="up-overlay"><b class="up-label">${esc(u.label)}</b><div class="up-bar"><i style="width:${Math.round(u.pct*100)}%"></i></div><small class="up-pct">${u.state==='error'?esc(u.error):u.state==='done'?'Xong ✓':Math.round(u.pct*100)+'%'}</small></div></div><p class="up-name">${esc(u.name)}</p></article>`;}
 function paintUpload(u){const el=document.getElementById('up-'+u.key);if(!el)return;el.classList.toggle('failed',u.state==='error');el.classList.toggle('done',u.state==='done');el.querySelector('.up-label').textContent=u.label;el.querySelector('.up-bar i').style.width=Math.round(u.pct*100)+'%';el.querySelector('.up-pct').textContent=u.state==='error'?u.error:u.state==='done'?'Xong ✓':Math.round(u.pct*100)+'%';}
-function settings(){return `<div class="section-head"><h1>Riêng tư theo cách của bạn.</h1><p>Bạn chọn chia sẻ bao nhiêu và kết nối với ai.</p></div><div class="settings-grid"><section class="settings-panel"><h2>Hiển thị hồ sơ</h2><div class="setting-row"><div><label for="visible-setting">Cho phép người khác tìm thấy bạn</label><p>Ẩn hồ sơ cũng tạm ẩn ảnh và quyền bắt đầu trò chuyện.</p></div><input id="visible-setting" type="checkbox" class="switch" ${me?.visible?'checked':''}></div></section><section class="settings-panel"><h2>Vị trí của bạn</h2><p>${me?.nearbyEnabled?'Đang bật tìm người ở gần.':'Chưa chia sẻ vị trí.'} Vị trí tự hết hạn sau 24 giờ; không hiển thị tọa độ hoặc ghim chính xác.</p><button class="button secondary" data-action="location-off" style="margin-top:16px">Tắt và xóa vị trí</button></section><section class="settings-panel"><h2>Hồ sơ đã chặn</h2>${blocked.length?blocked.map(p=>`<div class="blocked-row"><span>${esc(p.name)}</span><button class="text-button" data-unblock="${p.id}">Bỏ chặn</button></div>`).join(''):'<p>Bạn chưa chặn ai.</p>'}</section><section class="settings-panel"><h2>Tài khoản</h2><p>Đăng xuất khi dùng chung thiết bị để bảo vệ tài khoản.</p><button class="button secondary" data-action="logout" style="margin-top:16px">Đăng xuất</button></section></div>`;}
+function settings(){return `<div class="section-head"><h1>Riêng tư theo cách của bạn.</h1><p>Bạn chọn chia sẻ bao nhiêu và kết nối với ai.</p></div><div class="settings-grid"><section class="settings-panel"><h2>Tin nhắn</h2><div class="setting-row"><div><label for="popup-setting">Tự bật khung chat khi có tin mới (máy tính)</label><p>Mỗi người nhắn đến mở một khung chat ở góc phải, kể cả khi bạn đang xem trang khác. Trên điện thoại, tin mới hiện số đỏ ở mục Tin nhắn.</p></div><input id="popup-setting" type="checkbox" class="switch" ${prefs.popup?'checked':''}></div><div class="setting-row"><div><label for="sound-setting">Âm báo tin nhắn</label><p>Một tiếng "ting" nhỏ khi có tin mới.</p></div><input id="sound-setting" type="checkbox" class="switch" ${prefs.sound?'checked':''}></div><div class="setting-row"><div><b>Thông báo trên máy</b><p>${!('Notification' in window)?'Trình duyệt này không hỗ trợ thông báo.':Notification.permission==='granted'?'Đang bật — bạn nhận thông báo khi đang mở cửa sổ/ứng dụng khác.':Notification.permission==='denied'?'Đang chặn. Mở cài đặt trang của trình duyệt để cho phép.':'Hiện thông báo của hệ điều hành khi bạn đang làm việc khác.'}</p></div>${('Notification' in window)&&Notification.permission==='default'?'<button class="button secondary" data-action="notify-on">Bật</button>':''}</div></section><section class="settings-panel"><h2>Hiển thị hồ sơ</h2><div class="setting-row"><div><label for="visible-setting">Cho phép người khác tìm thấy bạn</label><p>Ẩn hồ sơ cũng tạm ẩn ảnh và quyền bắt đầu trò chuyện.</p></div><input id="visible-setting" type="checkbox" class="switch" ${me?.visible?'checked':''}></div></section><section class="settings-panel"><h2>Vị trí của bạn</h2><p>${me?.nearbyEnabled?'Đang bật tìm người ở gần.':'Chưa chia sẻ vị trí.'} Vị trí tự hết hạn sau 24 giờ; không hiển thị tọa độ hoặc ghim chính xác.</p><button class="button secondary" data-action="location-off" style="margin-top:16px">Tắt và xóa vị trí</button></section><section class="settings-panel"><h2>Hồ sơ đã chặn</h2>${blocked.length?blocked.map(p=>`<div class="blocked-row"><span>${esc(p.name)}</span><button class="text-button" data-unblock="${p.id}">Bỏ chặn</button></div>`).join(''):'<p>Bạn chưa chặn ai.</p>'}</section><section class="settings-panel"><h2>Tài khoản</h2><p>Đăng xuất khi dùng chung thiết bị để bảo vệ tài khoản.</p><button class="button secondary" data-action="logout" style="margin-top:16px">Đăng xuất</button></section></div>`;}
 async function render(){const rid=++renderId;++requestId;nav();if(route!=='discover'&&!session){if(!booting)showAuth();pendingRoute=route;route='discover';}$('#page').innerHTML=route==='discover'?discovery():route==='profile'?profilePage():route==='settings'?settings():empty('Đang tải…','');
  try{
  if(route==='discover')await results();
  if(route==='liked'){const data=await api('liked');if(rid!==renderId)return;$('#page').innerHTML=`<div class="section-head"><h1>Kết nối của bạn</h1><p>Những người khiến bạn muốn tìm hiểu thêm.</p></div><div class="profile-grid">${data.length?data.map(card).join(''):empty('Chưa có lượt thích.','Ghé Khám phá và lưu người bạn muốn làm quen.')}</div>`;}
  if(route==='settings'){blocked=await api('blocked');if(rid===renderId)$('#page').innerHTML=settings();}
- if(route==='messages'){contacts=await api('contacts');if(rid!==renderId)return;contacts.forEach(p=>cache.set(p.id,p));if(!contacts.some(p=>p.id===chatId))chatId=contacts[0]?.id||'';$('#page').innerHTML=`<div class="section-head"><h1>Một câu chuyện mới.</h1><p>Bắt đầu bằng một câu hỏi chân thành.</p></div>${contacts.length?`<div class="message-layout"><aside class="conversation-list"><h2>KẾT NỐI CỦA BẠN</h2><div id="conv-items">${convItems()}</div></aside><section class="chat" id="chat-panel"></section></div>`:empty('Chưa có cuộc trò chuyện.','Gửi một lời chào từ hồ sơ bạn muốn tìm hiểu.')}`;await loadChat();pollInbox();}
+ if(route==='messages'){contacts=await api('contacts');if(rid!==renderId)return;contacts.forEach(p=>cache.set(p.id,p));if(!contacts.some(p=>p.id===chatId))chatId=contacts[0]?.id||'';$('#page').innerHTML=`<div class="section-head"><h1>Một câu chuyện mới.</h1><p>Bắt đầu bằng một câu hỏi chân thành.</p></div>${contacts.length?`<div class="message-layout ${isMobile()?'list-only':''}"><aside class="conversation-list"><h2>KẾT NỐI CỦA BẠN</h2><div id="conv-items">${convItems()}</div></aside>${isMobile()?'':'<section class="chat" id="chat-panel"></section>'}</div>`:empty('Chưa có cuộc trò chuyện.','Gửi một lời chào từ hồ sơ bạn muốn tìm hiểu.')}`;await loadChat();pollInbox();}
  }catch(e){if(rid===renderId)toast(e.message);}
 }
-function convItems(){return contacts.map(p=>{const n=inbox.threads.find(t=>t.id===p.id)?.count||0;return `<button class="conversation ${p.id===chatId?'active':''}" data-chat="${p.id}">${avatar(p)}<span><b>${esc(p.name)}</b><small>${esc(p.city)}</small></span>${n&&p.id!==chatId?`<i class="conv-badge">${n}</i>`:''}</button>`;}).join('');}
+const shortTime=d=>{if(!d)return '';const t=new Date(d),n=new Date();return t.toDateString()===n.toDateString()?t.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):t.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'});};
+function convItems(){const mob=isMobile();return contacts.map(p=>{const th=inbox.threads.find(t=>t.id===p.id),n=th?.count||0,active=!mob&&p.id===chatId,prev=th?.preview||p.preview;return `<button class="conversation ${active?'active':''} ${n&&!active?'unread':''}" data-chat="${p.id}">${avatar(p)}<span class="conv-text"><b>${esc(p.name)}</b><small>${prev?`${p.lastMine&&!th?'Bạn: ':''}${esc(prev)}`:esc(p.city)}</small></span><span class="conv-meta"><small>${shortTime(th?.lastAt||p.lastAt)}</small>${n&&!active?`<i class="conv-badge">${n}</i>`:''}</span></button>`;}).join('');}
 async function loadChat(quiet=false){const id=chatId;if(!id||!$('#chat-panel'))return;const p=cache.get(id),messages=await api('messages',{id});if(chatId!==id||!$('#chat-panel'))return;chatMessages=messages;
  // Quiet refresh: only repaint the message list (keeps what the user is typing), and only when something changed.
  if(quiet&&$('#chat-panel').dataset.chat===id&&$('#chat-log')){const sig=msgSig(messages);if(sig===chatSig)return;chatSig=sig;if(inbox.unread)setTimeout(pollInbox,0);const log=$('#chat-log'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<80;log.innerHTML=messages.map(m=>bubble(m,m.sender_id===me.id,'data-chat-media')).join('');if(atBottom)log.scrollTop=log.scrollHeight;return;}
@@ -88,7 +89,7 @@ function reminder(){const b=$('#profile-banner');if(!b)return;if(!session||!me||
  b.innerHTML=`<div class="pb-text"><b>Hồ sơ hoàn thiện ${doneN}/${list.length}</b><span>Còn thiếu: ${list.filter(x=>!x[0]).map(x=>x[1]).join(', ')}. Hoàn thiện để xuất hiện trong Khám phá và nhắn tin.</span></div><div class="pb-bar"><i style="width:${Math.round(doneN/list.length*100)}%"></i></div><div class="pb-actions">${route==='profile'?'':'<button class="button primary" data-action="complete-profile">Hoàn thiện ngay</button>'}<button class="pb-close" data-action="remind-later" aria-label="Ẩn nhắc nhở">×</button></div>`;b.hidden=false;}
 async function refreshMe(){me=await api('me');nav();reminder();}
 async function authenticated(event,newSession){
- if(!newSession){session=null;me=null;cache.clear();items=[];samples=[];contacts=[];inbox={unread:0,threads:[]};inboxSeen={};inboxFirst=true;document.title=document.title.replace(/^\(\d+\+?\) /,'');closeDock();$('#modal').close();$('#lightbox').close();route='discover';reminder();render();showAuth();lastAuthToken='';return;}
+ if(!newSession){session=null;me=null;cache.clear();items=[];samples=[];contacts=[];inbox={unread:0,threads:[]};inboxSeen={};inboxFirst=true;document.title=baseTitle();clearInterval(titleFlash);titleFlash=0;closeDock();$('#modal').close();$('#lightbox').close();route='discover';reminder();render();showAuth();lastAuthToken='';return;}
  session=newSession;if(authRunning)return;if(lastAuthToken===newSession.access_token)return;
  authRunning=true;try{me=await api(event==='TOKEN_REFRESHED'?'me':'session',{event});nav();let accepted=false;try{accepted=sessionStorage.getItem('chich.adult.pending')==='yes';}catch{}if(accepted){await api('accept_adult');sessionStorage.removeItem('chich.adult.pending');await refreshMe();}if(standalone())await recordInstalled();endBoot();hideAuth();if(pendingRoute){route=pendingRoute;pendingRoute='';}await render();reminder();lastAuthToken=newSession.access_token;pollInbox();}catch(e){
   // Do not retry automatically for the same session (prevents the login popup from looping); offer retry / switch account instead.
@@ -131,7 +132,7 @@ document.addEventListener('click',async event=>{
  if(el.dataset.block){modal('Chặn hồ sơ này?',`<p>Hai bạn sẽ không thể tìm thấy nhau hoặc gửi tin nhắn cho nhau.</p><button class="button danger" data-confirm-block="${el.dataset.block}">Chặn hồ sơ</button>`);return;}
  if(el.dataset.confirmBlock){await api('block',{id:el.dataset.confirmBlock});$('#modal').close();cache.delete(el.dataset.confirmBlock);await refreshMe();await render();toast('Đã chặn hồ sơ.');return;}
  if(el.dataset.unblock){await api('unblock',{id:el.dataset.unblock});await render();return;}
- if(el.dataset.chat){chatId=el.dataset.chat;await render();return;}
+ if(el.dataset.chat){chatId=el.dataset.chat;if(isMobile()){await openDock(chatId);$('#conv-items')&&($('#conv-items').innerHTML=convItems());return;}await render();return;}
  if(el.dataset.cover){await api('edit_media',{id:el.dataset.cover,cover:true});await refreshMe();await render();return;}
  if(el.dataset.delete){modal('Xóa ảnh/video?',`<p>File này sẽ được gỡ khỏi hồ sơ và kho lưu trữ.</p><button class="button danger" data-confirm-delete="${el.dataset.delete}">Xóa file</button>`);return;}
  if(el.dataset.confirmDelete){await removeMedia(el.dataset.confirmDelete);$('#modal').close();await refreshMe();await render();return;}
@@ -139,17 +140,22 @@ document.addEventListener('click',async event=>{
  if(el.dataset.suspendReport){modal('Tạm khóa tài khoản?',`<p>Tài khoản bị báo cáo sẽ không thể sử dụng dịch vụ. Bạn có thể khôi phục trong cơ sở dữ liệu quản trị.</p><button class="button danger" data-confirm-suspend="${el.dataset.suspendReport}">Tạm khóa tài khoản</button>`);return;}
  if(el.dataset.confirmSuspend){await api('admin_resolve',{id:el.dataset.confirmSuspend,suspend:true});$('#modal').close();await render();return;}
  if(el.dataset.slide){clearInterval(slideTimer);showSlide(Number(el.dataset.slide));return;}
- if(el.dataset.eph){el.disabled=true;try{const inDock=!!el.closest('#chat-dock');await openEphemeral(el.dataset.eph,inDock?dock.messages:chatMessages);if(inDock)await loadDock();else await loadChat();}finally{el.disabled=false;}return;}
+ if(el.dataset.eph){el.disabled=true;try{const w=winOf(el);await openEphemeral(el.dataset.eph,w?w.messages:chatMessages);if(w)await loadWin(w.id);else await loadChat();}finally{el.disabled=false;}return;}
  if(el.dataset.tease){await openDock(el.dataset.tease,{tease:true});return;}
  if(el.dataset.dock){await openDock(el.dataset.dock);return;}
  if(el.dataset.teaser){await sendTease(el.dataset.teaser,el);return;}
- if(el.dataset.dockMedia){const msg=dock.messages.find(x=>x.id===el.dataset.dockMedia),m=msg?.media?.[0];if(m){gallery=[{...m,ephExp:msg.ephemeral?msg.expiresAt:undefined}];galleryIndex=0;paintGallery();if(!$('#lightbox').open)$('#lightbox').showModal();}return;}
+ if(el.dataset.winFocus){focusWin(el.dataset.winFocus);return;}
+ if(el.dataset.dockMedia){const msg=(winOf(el)?.messages||[]).find(x=>x.id===el.dataset.dockMedia),m=msg?.media?.[0];if(m){gallery=[{...m,ephExp:msg.ephemeral?msg.expiresAt:undefined}];galleryIndex=0;paintGallery();if(!$('#lightbox').open)$('#lightbox').showModal();}return;}
  if(el.dataset.chatMedia){const msg=chatMessages.find(x=>x.id===el.dataset.chatMedia),m=msg?.media?.[0];if(m){gallery=[{...m,ephExp:msg.ephemeral?msg.expiresAt:undefined}];galleryIndex=0;paintGallery();if(!$('#lightbox').open)$('#lightbox').showModal();}return;}
  const action=el.dataset.action;
  if(action==='clear-attach'){chatFile=null;paintAttach();return;}
- if(action==='dock-close'){closeDock();return;}
- if(action==='dock-tray'){dock.tray=!dock.tray;$('#dock-tray').hidden=!dock.tray;el.classList.toggle('on',dock.tray);if(dock.tray)await paintTray();return;}
- if(action==='dock-clear-attach'){dock.file=null;paintDockAttach();return;}
+ if(action==='dock-close'){const w=winOf(el);if(w)closeWin(w.id);return;}
+ if(action==='win-min'){event.stopPropagation();const w=winOf(el);if(w)toggleMin(w.id);return;}
+ if(action==='win-toggle'){const w=winOf(el);if(w&&w.min&&!isMobile())toggleMin(w.id);return;}
+ if(action==='notify-on'){await enableNotifications();return;}
+ if(action==='notify-later'){notifyAsk.dismissed=true;el.closest('.notify-ask')?.remove();return;}
+ if(action==='dock-tray'){const w=winOf(el);if(!w)return;w.tray=!w.tray;const n=winNode(w.id);n.querySelector('.dock-tray').hidden=!w.tray;el.classList.toggle('on',w.tray);if(w.tray)await paintTray(n);return;}
+ if(action==='dock-clear-attach'){const w=winOf(el);if(w){w.file=null;paintDockAttach(w);}return;}
  if(action==='feedback'){openFeedback();return;}
  if(action==='feedback-close'){closeFeedback();return;}
  if(action==='close')$('#modal').close();
@@ -184,16 +190,17 @@ document.addEventListener('change',async e=>{try{
   if(e.target.id==='intent-filter'){filters.intent=e.target.value;await results();}
  if(e.target.dataset.filter){filters[e.target.dataset.filter]=e.target.value;await results();}
  if(e.target.id==='radius-filter'){filters.radius=Number(e.target.value);if(filters.radius&&!me?.nearbyEnabled){await nearby();return;}await results();}
+ if(e.target.id==='popup-setting'||e.target.id==='sound-setting'){try{localStorage.setItem(e.target.id==='popup-setting'?'chich.chat.popup':'chich.chat.sound',e.target.checked?'on':'off');}catch{}toast(e.target.checked?'Đã bật.':'Đã tắt.');if(e.target.id==='sound-setting'&&e.target.checked)ping();return;}
  if(e.target.id==='visible-setting'){try{await api('visibility',{visible:e.target.checked});await refreshMe();toast('Đã cập nhật quyền hiển thị.');}catch(error){e.target.checked=!!me?.visible;throw error;}}
  if(e.target.id==='chat-file'){const f=e.target.files?.[0];e.target.value='';if(f){if(f.type.startsWith('video/')){if(!['video/mp4','video/webm'].includes(f.type)||f.size>20*1024*1024)throw new Error('Video phải là MP4/WebM, tối đa 20 MB.');}else{const err=photoValidationError(f);if(err)throw new Error(err);}chatFile=f;paintAttach();}}
- if(e.target.id==='dock-eph'){dock.eph=Number(e.target.value)||0;paintDockAttach();return;}
+ if(e.target.classList.contains('dock-eph')){const w=winOf(e.target);if(w){w.eph=Number(e.target.value)||0;paintDockAttach(w);}return;}
  if(e.target.id==='chat-eph'){chatEph=Number(e.target.value)||0;paintAttach();return;}
- if(e.target.id==='dock-file'){const f=e.target.files?.[0];e.target.value='';if(f){validateChatFile(f);dock.file=f;paintDockAttach();}}
+ if(e.target.classList.contains('dock-file')){const f=e.target.files?.[0];e.target.value='';const w=winOf(e.target);if(f&&w){validateChatFile(f);w.file=f;paintDockAttach(w);}}
  if(e.target.id==='media-input'){const files=[...e.target.files];e.target.value='';await addMedia(files);}
  }catch(error){toast(error.message);}});
 document.addEventListener('submit',async e=>{
- if(e.target.id==='dock-form'){e.preventDefault();const f=e.target,b=f.querySelector('.dock-send'),text=f.text.value.trim(),file=dock.file,id=dock.id;if(!text&&!file){toast('Nhập tin nhắn hoặc chọn ảnh/video.');return;}if(b.disabled)return;b.disabled=true;
-  try{await sendChat(id,text,file,(label,p)=>paintDockAttach(`<span>${label} ${Math.round(p*100)}%</span><span class="mini-bar"><i style="width:${Math.round(p*100)}%"></i></span>`),dock.eph);f.text.value='';dock.file=null;dock.eph=0;paintDockAttach();await loadDock();}catch(err){toast(err.message);paintDockAttach();}finally{b.disabled=false;f.text.focus();}return;}
+ if(e.target.classList.contains('dock-form')){e.preventDefault();const f=e.target,w=winOf(f);if(!w)return;const b=f.querySelector('.dock-send'),text=f.text.value.trim(),file=w.file,id=w.id;if(!text&&!file){toast('Nhập tin nhắn hoặc chọn ảnh/video.');return;}if(b.disabled)return;b.disabled=true;
+  try{await sendChat(id,text,file,(label,p)=>paintDockAttach(w,`<span>${label} ${Math.round(p*100)}%</span><span class="mini-bar"><i style="width:${Math.round(p*100)}%"></i></span>`),w.eph);f.text.value='';w.file=null;w.eph=0;paintDockAttach(w);await loadWin(id);}catch(err){toast(err.message);paintDockAttach(w);}finally{b.disabled=false;f.text.focus();}return;}
  if(!['profile-form','message-form','intro-form','report-form','hero-form'].includes(e.target.id)&&!e.target.dataset.captionForm)return;
  e.preventDefault();const form=e.target,data=Object.fromEntries(new FormData(form));const button=form.querySelector('button[type="submit"],button');if(button?.disabled)return;if(button)button.disabled=true;
  try{
@@ -242,34 +249,92 @@ setInterval(()=>{
  if($('#lightbox').open&&gallery[0]?.ephExp&&new Date(gallery[0].ephExp)<=Date.now()){gallery=[];$('#lightbox').close();toast('Ảnh/video đã tự hủy.');}
 },1000);
 async function openEphemeral(id,list){const m=await api('open_ephemeral',{id});const k=list.findIndex(x=>x.id===id);if(k>=0)list[k]=m;const a=m.media?.[0];if(a){gallery=[{...a,ephExp:m.expiresAt,caption:`Tự hủy sau ${ephLabel(m.ephemeral)} kể từ lúc mở`}];galleryIndex=0;paintGallery();if(!$('#lightbox').open)$('#lightbox').showModal();}return m;}
-async function openDock(id,{tease=false}={}){
+// ---------- Chat windows (kiểu Messenger): nhiều cuộc trò chuyện cùng lúc ----------
+// Desktop: tối đa 3 khung cạnh nhau ở góc phải dưới, khung thừa thu thành bong bóng avatar; mỗi khung thu nhỏ được.
+// Mobile: 1 khung dạng bottom sheet + hàng avatar để chuyển nhanh; thu nhỏ thành bong bóng nổi có số tin chưa đọc.
+const wins=new Map();let winOrder=[],sheetOpen=true;
+const isMobile=()=>matchMedia('(max-width:900px)').matches;
+const maxOpen=()=>isMobile()?1:Math.max(1,Math.min(3,Math.floor((innerWidth-110)/352)));
+const prefs={get popup(){try{return localStorage.getItem('chich.chat.popup')!=='off';}catch{return true;}},get sound(){try{return localStorage.getItem('chich.chat.sound')!=='off';}catch{return true;}}};
+function winOf(el){const w=el?.closest?.('.dock-win');return w?wins.get(w.dataset.win):null;}
+function winNode(id){return [...document.querySelectorAll('.dock-win')].find(n=>n.dataset.win===id)||null;}
+// Which windows are on screen right now (open, not minimised, within the visible slots).
+function shownIds(){const list=winOrder.filter(id=>!wins.get(id).min||!isMobile());if(isMobile())return sheetOpen&&winOrder[0]?[winOrder[0]]:[];return winOrder.slice(0,maxOpen());}
+function isReading(id){return (!document.hidden&&shownIds().includes(id)&&!wins.get(id)?.min)||(route==='messages'&&chatId===id&&!document.hidden);}
+async function openDock(id,{tease=false,incoming=false}={}){
  if(!session){showAuth();return;}
- if(!me?.complete){toast('Hoàn thiện hồ sơ (kèm ít nhất 1 ảnh) để nhắn tin và thả thính.');go('profile');return;}
- if($('#modal').open)$('#modal').close();
- const p=await ensureProfile(id);const el=$('#chat-dock');
- if(dock.id===id&&!el.hidden){dock.tray=tease||dock.tray;$('#dock-tray').hidden=!dock.tray;$('.dock-fire').classList.toggle('on',dock.tray);if(dock.tray)await paintTray();return;}
- dock.id=id;dock.tray=tease;dock.file=null;dock.messages=[];
- el.innerHTML=`<header class="dock-head">${avatar(p)}<div class="dock-who"><b>${esc(p.name)}</b><small>${esc(p.distance||p.city)}</small></div><button class="dock-icon" data-open="${id}" title="Xem hồ sơ" aria-label="Xem hồ sơ">↗</button><button class="dock-icon" data-action="dock-close" aria-label="Đóng khung chat">×</button></header>
- <div class="dock-log" id="dock-log" role="log" aria-live="polite"><p class="dock-empty">Đang tải…</p></div>
- <div class="dock-tray" id="dock-tray" ${tease?'':'hidden'}><div class="tray-head"><b>🔥 Thả thính nhanh</b><small>Chạm một câu để gửi ngay</small></div><div class="tray-list" id="tray-list"><span class="fine-print">Đang tải…</span></div></div>
- <div class="dock-attach" id="dock-attach" hidden></div>
- <form class="dock-compose" id="dock-form"><button type="button" class="dock-fire ${tease?'on':''}" data-action="dock-tray" aria-label="Mở câu thả thính" title="Thả thính">🔥</button><label class="dock-icon" for="dock-file" title="Gửi ảnh hoặc video" aria-label="Đính kèm ảnh hoặc video">📎</label><input id="dock-file" type="file" accept="${ACCEPT_MEDIA}" hidden><input name="text" maxlength="1000" placeholder="Nhắn cho ${esc(p.name)}…" autocomplete="off" aria-label="Tin nhắn"><button class="dock-send" aria-label="Gửi">➤</button></form>`;
- el.hidden=false;requestAnimationFrame(()=>el.classList.add('open'));
- if(tease)paintTray();
- await loadDock();pollInbox();
- clearInterval(dock.timer);dock.timer=setInterval(()=>{if(!document.hidden&&dock.id)loadDock(true).catch(()=>{});},4000);
+ if(!incoming&&!me?.complete){toast('Hoàn thiện hồ sơ (kèm ít nhất 1 ảnh) để nhắn tin và thả thính.');go('profile');return;}
+ if(!incoming&&$('#modal').open)$('#modal').close();
+ await ensureProfile(id);
+ let w=wins.get(id);
+ if(!w){w={id,messages:[],file:null,tray:false,eph:0,min:false,unread:0,sig:''};wins.set(id,w);}
+ if(incoming){
+  // A new message: bring the conversation up without stealing what the user is doing.
+  const focused=winOf(document.activeElement)?.id;
+  if(isMobile()){
+   // Phone: never swap the conversation the user is looking at; otherwise pop the sheet up.
+   if(sheetOpen&&winOrder[0]&&winOrder[0]!==id){if(!winOrder.includes(id))winOrder.push(id);}
+   else{winOrder=[id,...winOrder.filter(x=>x!==id)];sheetOpen=true;}
+  }else if(!shownIds().includes(id)){
+   winOrder=[id,...winOrder.filter(x=>x!==id)];
+   // keep the window being typed in on screen
+   if(focused&&focused!==id&&!winOrder.slice(0,maxOpen()).includes(focused))winOrder=[id,focused,...winOrder.filter(x=>x!==id&&x!==focused)];
+  }
+ }else{if(isMobile()){for(const k of [...wins.keys()])if(k!==id)wins.delete(k);winOrder=[id];}else winOrder=[id,...winOrder.filter(x=>x!==id)];w.min=false;sheetOpen=true;if(tease)w.tray=true;}
+ paintDocks();
+ const node=winNode(id);
+ if(node&&!incoming){if(w.tray)paintTray(node);node.querySelector('input[name=text]')?.focus({preventScroll:true});}
+ if(isReading(id))await loadWin(id);else w.unread=Math.max(w.unread,1),paintHeads();
 }
-function closeDock(){clearInterval(dock.timer);dock.id='';dock.file=null;const el=$('#chat-dock');if(el){el.classList.remove('open');el.hidden=true;el.innerHTML='';}}
-async function loadDock(quiet=false){const id=dock.id;if(!id)return;let msgs;try{msgs=await api('messages',{id});}catch(e){if(!quiet)$('#dock-log').innerHTML=`<p class="dock-empty">${esc(e.message)}</p>`;return;}if(dock.id!==id||!$('#dock-log'))return;
- const log=$('#dock-log'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<60,changed=msgSig(msgs)!==msgSig(dock.messages);dock.messages=msgs;
- if(!changed&&quiet)return;
- if(quiet&&inbox.unread)setTimeout(pollInbox,0);
+function closeWin(id){wins.delete(id);winOrder=winOrder.filter(x=>x!==id);paintDocks();if(route==='messages'&&$('#conv-items'))api('contacts').then(c=>{contacts=c;c.forEach(p=>cache.set(p.id,p));if($('#conv-items'))$('#conv-items').innerHTML=convItems();}).catch(()=>{});}
+function closeDock(){wins.clear();winOrder=[];paintDocks();}
+function winHTML(w,open=false,first=true){const p=cache.get(w.id)||{name:'…'};const others=[];const mob=isMobile();
+ return `<section class="chat-dock dock-win ${w.min?'min':''} ${open?'open':''}" data-win="${w.id}" aria-label="Trò chuyện với ${esc(p.name)}">
+ <header class="dock-head" data-action="win-toggle">${mob?'<button class="dock-icon dock-back" data-action="dock-close" aria-label="Quay lại danh sách">‹</button>':''}${avatar(p)}<div class="dock-who"><b>${esc(p.name)}</b><small>${esc(p.distance||p.city||'')}</small></div><button class="dock-icon" data-open="${w.id}" title="Xem hồ sơ" aria-label="Xem hồ sơ">↗</button>${mob?'':'<button class="dock-icon" data-action="win-min" aria-label="Thu nhỏ" title="Thu nhỏ">–</button><button class="dock-icon" data-action="dock-close" aria-label="Đóng khung chat" title="Đóng">×</button>'}</header>
+ ${others.length?`<div class="dock-switch" aria-label="Các cuộc trò chuyện khác">${others.map(x=>{const q=cache.get(x)||{},u=wins.get(x)?.unread;return `<button class="switch-head" data-win-focus="${x}" title="${esc(q.name||'')}">${avatar(q)}${u?`<i>${u}</i>`:''}</button>`;}).join('')}</div>`:''}
+ ${first?notifyAsk():''}
+ <div class="dock-log" role="log" aria-live="polite">${w.messages.length?w.messages.map(m=>bubble(m,m.sender_id===me.id,'data-dock-media')).join(''):'<p class="dock-empty">Đang tải…</p>'}</div>
+ <div class="dock-tray" ${w.tray?'':'hidden'}><div class="tray-head"><b>🔥 Thả thính nhanh</b><small>Chạm một câu để gửi ngay</small></div><div class="tray-list"><span class="fine-print">Đang tải…</span></div></div>
+ <div class="dock-attach" hidden></div>
+ <form class="dock-compose dock-form"><button type="button" class="dock-fire ${w.tray?'on':''}" data-action="dock-tray" aria-label="Mở câu thả thính" title="Thả thính">🔥</button><label class="dock-icon" title="Gửi ảnh hoặc video" aria-label="Đính kèm ảnh hoặc video">📎<input class="dock-file" type="file" accept="${ACCEPT_MEDIA}" hidden></label><input name="text" maxlength="1000" placeholder="Nhắn cho ${esc(p.name)}…" autocomplete="off" aria-label="Tin nhắn"><button class="dock-send" aria-label="Gửi">➤</button></form></section>`;}
+// Re-render windows while keeping each window's typed text, focus and scroll position.
+function paintDocks(){const root=$('#chat-dock');if(!root)return;const shown=shownIds();
+ const keep={};document.querySelectorAll('.dock-win').forEach(n=>{const i=n.querySelector('input[name=text]'),l=n.querySelector('.dock-log');keep[n.dataset.win]={text:i?.value||'',focus:document.activeElement===i,scroll:l?l.scrollHeight-l.scrollTop-l.clientHeight:0};});
+ root.innerHTML=`<div class="dock-heads" aria-label="Cuộc trò chuyện đang mở"></div>${shown.map((id,i)=>winHTML(wins.get(id),!!keep[id],i===0)).join('')}`;
+ shown.forEach(id=>{const n=winNode(id),k=keep[id],w=wins.get(id);if(!n)return;requestAnimationFrame(()=>n.classList.add('open'));const l=n.querySelector('.dock-log');l.scrollTop=k?l.scrollHeight-l.clientHeight-k.scroll:l.scrollHeight;if(k){n.querySelector('input[name=text]').value=k.text;if(k.focus)n.querySelector('input[name=text]').focus({preventScroll:true});}if(w.tray)paintTray(n);paintDockAttach(w);});
+ root.classList.toggle('has-wins',shown.length>0);document.body.classList.toggle('sheet-open',isMobile()&&shown.length>0);paintHeads();}
+function paintHeads(){const box=$('#chat-dock .dock-heads');if(!box)return;const shown=shownIds();const hidden=winOrder.filter(id=>!shown.includes(id));
+ box.innerHTML=hidden.slice(0,5).map(id=>{const p=cache.get(id)||{},u=wins.get(id)?.unread;return `<button class="chat-head" data-win-focus="${id}" title="${esc(p.name||'')}" aria-label="Mở trò chuyện với ${esc(p.name||'')}${u?`, ${u} tin chưa đọc`:''}">${avatar(p)}${u?`<i>${u>9?'9+':u}</i>`:''}</button>`;}).join('')+(hidden.length>5?`<span class="chat-head more">+${hidden.length-5}</span>`:'');
+ document.querySelectorAll('.dock-win.min').forEach(n=>{const w=wins.get(n.dataset.win);const h=n.querySelector('.dock-head');h.querySelector('.win-badge')?.remove();if(w?.unread)h.querySelector('.dock-who').insertAdjacentHTML('afterend',`<i class="win-badge">${w.unread}</i>`);});}
+function focusWin(id){const w=wins.get(id);if(!w)return;w.min=false;winOrder=[id,...winOrder.filter(x=>x!==id)];sheetOpen=true;paintDocks();winNode(id)?.querySelector('input[name=text]')?.focus({preventScroll:true});loadWin(id).catch(()=>{});}
+function toggleMin(id){const w=wins.get(id);if(!w)return;if(isMobile()){sheetOpen=false;paintDocks();return;}w.min=!w.min;paintDocks();if(!w.min)loadWin(id).catch(()=>{});}
+async function loadWin(id,quiet=false){const w=wins.get(id);if(!w)return;let msgs;
+ try{msgs=await api('messages',{id});}catch(e){const l=winNode(id)?.querySelector('.dock-log');if(!quiet&&l)l.innerHTML=`<p class="dock-empty">${esc(e.message)}</p>`;return;}
+ if(!wins.has(id))return;const sig=msgSig(msgs),changed=sig!==w.sig;w.messages=msgs;w.sig=sig;w.unread=0;
+ const n=winNode(id),log=n?.querySelector('.dock-log');if(!log){paintHeads();return;}
+ if(!changed&&quiet&&!log.querySelector('.dock-empty'))return;
+ const atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<60;
  log.innerHTML=msgs.length?msgs.map(m=>bubble(m,m.sender_id===me.id,'data-dock-media')).join(''):`<p class="dock-empty">Chưa có tin nhắn. Bắt đầu bằng một câu chào, hoặc bấm 🔥 để thả thính.</p>`;
- if(!quiet||atBottom)log.scrollTop=log.scrollHeight;}
-async function paintTray(){const list=$('#tray-list');if(!list)return;try{const t=await loadTeasers();list.innerHTML=t.length?t.map(x=>`<button type="button" class="tray-item" data-teaser="${x.id}">${esc(x.body)}</button>`).join(''):'<span class="fine-print">Chưa có câu thả thính nào.</span>';}catch(e){list.innerHTML=`<span class="fine-print">${esc(e.message)}</span>`;}}
+ if(!quiet||atBottom)log.scrollTop=log.scrollHeight;paintHeads();if(inbox.unread)setTimeout(pollInbox,0);}
+// Compatibility for older call sites (single dock).
+const dock={get id(){return winOrder[0]||'';}};
+function loadDock(quiet){return winOrder[0]?loadWin(winOrder[0],quiet):Promise.resolve();}
+async function paintTray(node){const list=node?.querySelector('.tray-list');if(!list)return;try{const t=await loadTeasers();list.innerHTML=t.length?t.map(x=>`<button type="button" class="tray-item" data-teaser="${x.id}">${esc(x.body)}</button>`).join(''):'<span class="fine-print">Chưa có câu thả thính nào.</span>';}catch(e){list.innerHTML=`<span class="fine-print">${esc(e.message)}</span>`;}}
 function flameBurst(from){const r=from.getBoundingClientRect();if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;for(let i=0;i<14;i++){const f=document.createElement('span');f.className='flame-particle';f.textContent=i%4?'🔥':'💥';f.style.left=(r.left+r.width/2)+'px';f.style.top=(r.top+r.height/2)+'px';f.style.setProperty('--dx',(Math.random()*220-110)+'px');f.style.setProperty('--dy',(-90-Math.random()*170)+'px');f.style.setProperty('--rot',(Math.random()*80-40)+'deg');f.style.animationDelay=(i*25)+'ms';document.body.appendChild(f);setTimeout(()=>f.remove(),1400);}}
-async function sendTease(teaserId,btn){if(!dock.id)return;btn.disabled=true;flameBurst(btn);btn.classList.add('sent');try{await api('send',{id:dock.id,teaserId});await loadDock();const last=$('#dock-log .bubble.me:last-child');last?.classList.add('just-sent');toast('🔥 Đã thả thính!');}catch(e){toast(e.message);}finally{setTimeout(()=>{btn.disabled=false;btn.classList.remove('sent');},900);}}
-function paintDockAttach(text){const box=$('#dock-attach');if(!box)return;box.hidden=!dock.file;if(dock.file)box.innerHTML=text||`<span>${dock.file.type.startsWith('video/')?'🎬':'🖼'} ${esc(dock.file.name)} · ${(dock.file.size/1048576).toFixed(1)} MB</span>${ephSelect('dock-eph',dock.eph)}<button type="button" class="text-button" data-action="dock-clear-attach">Bỏ</button>${dock.eph?'<small class="eph-note">Người nhận vẫn có thể chụp màn hình.</small>':''}`;}
+async function sendTease(teaserId,btn){const w=winOf(btn);if(!w)return;btn.disabled=true;flameBurst(btn);btn.classList.add('sent');try{await api('send',{id:w.id,teaserId});await loadWin(w.id);winNode(w.id)?.querySelector('.bubble.me:last-child')?.classList.add('just-sent');toast('🔥 Đã thả thính!');}catch(e){toast(e.message);}finally{setTimeout(()=>{btn.disabled=false;btn.classList.remove('sent');},900);}}
+function paintDockAttach(w,text){const box=winNode(w.id)?.querySelector('.dock-attach');if(!box)return;box.hidden=!w.file;if(w.file)box.innerHTML=text||`<span>${w.file.type.startsWith('video/')?'🎬':'🖼'} ${esc(w.file.name)} · ${(w.file.size/1048576).toFixed(1)} MB</span>${ephSelect('',w.eph).replace('<select id=""','<select class="dock-eph"')}<button type="button" class="text-button" data-action="dock-clear-attach">Bỏ</button>${w.eph?'<small class="eph-note">Người nhận vẫn có thể chụp màn hình.</small>':''}`;}
+window.addEventListener('resize',()=>{clearTimeout(paintDocks.t);paintDocks.t=setTimeout(paintDocks,200);});
+// Every visible, expanded window refreshes every 4 s while the page is on screen.
+setInterval(()=>{if(!session||document.hidden)return;shownIds().forEach(id=>{if(!wins.get(id)?.min)loadWin(id,true).catch(()=>{});});},4000);
+// ---------- Notices outside the page: system notification, tab title, sound ----------
+function notifyAsk(){return ('Notification' in window)&&Notification.permission==='default'&&!notifyAsk.dismissed?`<div class="notify-ask"><span>🔔 Bật thông báo để biết tin nhắn mới cả khi đang làm việc khác.</span><button type="button" class="text-button" data-action="notify-on">Bật</button><button type="button" class="text-button" data-action="notify-later">Để sau</button></div>`:'';}
+async function enableNotifications(){try{const r=await Notification.requestPermission();notifyAsk.dismissed=true;paintDocks();if(route==='settings')render();toast(r==='granted'?'Đã bật thông báo tin nhắn.':'Bạn có thể bật lại trong cài đặt trình duyệt.');}catch{}}
+async function systemNotify(t){if(!('Notification' in window)||Notification.permission!=='granted')return;const p=cache.get(t.id)||{};const opts={body:t.preview||'Tin nhắn mới',tag:'chat-'+t.id,renotify:true,icon:'assets/icons/icon-192.png',badge:'assets/icons/icon-192.png',data:{chat:t.id}};
+ try{const reg=await navigator.serviceWorker?.getRegistration();if(reg)await reg.showNotification(`💬 ${t.name||p.name||'Tin nhắn mới'}`,opts);else{const n=new Notification(`💬 ${t.name||'Tin nhắn mới'}`,opts);n.onclick=()=>{window.focus();focusWin(t.id);n.close();};}}catch{}}
+let titleFlash=0;const baseTitle=()=>document.title.replace(/^(\(\d+\+?\) |💬 .*? · )/,'');
+function flashTitle(name){clearInterval(titleFlash);let on=false;const base=baseTitle();titleFlash=setInterval(()=>{if(!document.hidden&&document.hasFocus()){clearInterval(titleFlash);document.title=(inbox.unread?`(${inbox.unread}) `:'')+base;return;}on=!on;document.title=on?`💬 ${name} nhắn tin · `+base:`(${inbox.unread||1}) `+base;},1200);}
+let audioCtx=null;function ping(){if(!prefs.sound)return;try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(880,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(1320,audioCtx.currentTime+.12);g.gain.setValueAtTime(.0001,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.18,audioCtx.currentTime+.02);g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.35);o.connect(g).connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.36);}catch{}}
+navigator.serviceWorker?.addEventListener('message',e=>{if(e.data?.openChat){window.focus();openDock(e.data.openChat).catch(()=>{});}});
 function validateChatFile(f){if(f.type.startsWith('video/')){if(!['video/mp4','video/webm'].includes(f.type)||f.size>20*1024*1024)throw new Error('Video phải là MP4/WebM, tối đa 20 MB.');}else{const err=photoValidationError(f);if(err)throw new Error(err);}}
 async function sendChat(id,text,file,onStatus,eph=0){let mediaId;if(file){onStatus?.('Đang nén…',0);let blob=file,thumb=null,label='Đang tải lên…';if(file.type.startsWith('image/')){const pr=await preparePhoto(file);blob=pr.blob;thumb=eph?null:pr.thumb;label=`Đang tải ${fmtSize(blob.size)}…`;}mediaId=await upload(blob,'chat',p=>onStatus?.(label,p),thumb);}await api('send',{id,text,...(mediaId?{mediaId}:{}),...(mediaId&&eph?{ephemeral:String(eph)}:{})});}
 // ---------- Feedback (sign-in page + footer): small window, 1 per 24h ----------
@@ -305,6 +370,7 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installProm
 window.addEventListener('appinstalled',()=>{installPrompt=null;recordInstalled();toast('Đã cài CHI.CH DAO. Mở từ biểu tượng trên màn hình của bạn.');});
 if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 route=['discover','liked','messages','profile','settings','admin'].includes(location.hash.slice(1))?location.hash.slice(1):'discover';
+try{const q=new URLSearchParams(location.search).get('chat');if(q&&/^[0-9a-f-]{36}$/i.test(q)){chatId=q;history.replaceState(null,'',location.pathname+location.hash);}}catch{}
 applyTheme(document.documentElement.dataset.theme);
 $('#region-list').innerHTML=regionOptions();
 // Returning from Google (?code=) or with a saved session: show a short loader instead of flashing the 18+ / login popup.
@@ -316,17 +382,23 @@ if(supabase&&configured){supabase.auth.onAuthStateChange((event,s)=>{setTimeout(
 // ---------- Live updates (no WebSocket: polling only while the tab is visible) ----------
 setInterval(()=>{if(session&&!document.hidden&&route==='messages'&&chatId&&$('#chat-panel'))loadChat(true).catch(()=>{});},4000);
 async function pollInbox(){
- if(!session||document.hidden)return;let data;try{data=await api('inbox');}catch{return;}
+ if(!session)return;let data;try{data=await api('inbox');}catch{return;}
  const before=inbox.unread;inbox={unread:Number(data.unread)||0,threads:data.threads||[]};
- const openId=dock.id&&!$('#chat-dock').hidden?dock.id:route==='messages'?chatId:'';
- const fresh=inbox.threads.filter(t=>t.id!==openId&&inboxSeen[t.id]!==t.lastAt);
- if(inbox.threads.some(t=>t.id===openId&&inboxSeen[t.id]!==t.lastAt)){if(openId===dock.id)loadDock(true).catch(()=>{});else loadChat(true).catch(()=>{});}
- if(inboxFirst){if(inbox.unread)notify(null,`Bạn có ${inbox.unread} tin nhắn chưa đọc`);}
- else fresh.forEach(t=>notify(t.id,`${t.name||'Một người'}: ${t.preview||'Tin nhắn mới'}`));
+ const fresh=inbox.threads.filter(t=>inboxSeen[t.id]!==t.lastAt);const away=document.hidden||!document.hasFocus();
+ if(inboxFirst){if(inbox.unread&&route!=='messages')notify(null,`Bạn có ${inbox.unread} tin nhắn chưa đọc`);}
+ else for(const t of fresh){
+  if(isReading(t.id)){if(wins.has(t.id))loadWin(t.id,true).catch(()=>{});else loadChat(true).catch(()=>{});if(away){systemNotify(t);flashTitle(t.name);}continue;}
+  const w=wins.get(t.id);if(w)w.unread=t.count;
+  if(!isMobile()&&prefs.popup&&!(route==='messages'&&!document.hidden)){await openDock(t.id,{incoming:true}).catch(()=>{});if(wins.get(t.id))wins.get(t.id).unread=t.count;}
+  if(route!=='messages'&&!isReading(t.id)&&!(prefs.popup&&winOrder.includes(t.id)&&!away))notify(t.id,`${t.name||'Một người'}: ${t.preview||'Tin nhắn mới'}`);
+  if(away){systemNotify(t);flashTitle(t.name||'Ai đó');}
+  ping();
+ }
  inbox.threads.forEach(t=>inboxSeen[t.id]=t.lastAt);inboxFirst=false;
- if(before!==inbox.unread)nav();
- document.title=(inbox.unread?`(${inbox.unread}) `:'')+document.title.replace(/^\(\d+\+?\) /,'');
- if(route==='messages'&&$('#conv-items')){if(fresh.some(t=>!contacts.some(c=>c.id===t.id))){try{contacts=await api('contacts');contacts.forEach(p=>cache.set(p.id,p));}catch{}}$('#conv-items').innerHTML=convItems();}
+ for(const [id,w] of wins){const t=inbox.threads.find(x=>x.id===id);if(!t&&!isReading(id))w.unread=0;}
+ paintHeads();if(before!==inbox.unread)nav();
+ if(!titleFlash||(!document.hidden&&document.hasFocus()))document.title=(inbox.unread?`(${inbox.unread}) `:'')+baseTitle();
+ if(route==='messages'&&$('#conv-items')){if(fresh.length&&!inboxFirst){try{contacts=await api('contacts');contacts.forEach(p=>cache.set(p.id,p));}catch{}}$('#conv-items').innerHTML=convItems();}
 }
 function notify(id,text){
  const box=$('#msg-notice')||Object.assign(document.createElement('div'),{id:'msg-notice',className:'msg-notice'});if(!box.isConnected)document.body.appendChild(box);
@@ -338,5 +410,10 @@ function notify(id,text){
  el.querySelector('[data-nav]')?.addEventListener('click',close);
  setTimeout(close,9000);
 }
+// 10 s while on screen; also keeps running in a background tab (browsers may slow it to about once a minute).
 setInterval(pollInbox,10000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){pollInbox();if(dock.id)loadDock(true).catch(()=>{});}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){pollInbox();shownIds().forEach(id=>{if(!wins.get(id)?.min)loadWin(id,true).catch(()=>{});});}});
+window.addEventListener('focus',()=>{clearInterval(titleFlash);titleFlash=0;document.title=(inbox.unread?`(${inbox.unread}) `:'')+baseTitle();});
+
+// Phones: keep the chat sheet exactly above the on-screen keyboard (iOS does not shrink 100dvh for it).
+if(window.visualViewport){const vv=window.visualViewport,fit=()=>{document.documentElement.style.setProperty('--vvh',vv.height+'px');document.documentElement.style.setProperty('--vvtop',vv.offsetTop+'px');};vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit);fit();}

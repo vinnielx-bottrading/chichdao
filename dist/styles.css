@@ -234,3 +234,57 @@ img[data-logo]{height:auto;object-fit:contain}
 @keyframes noteIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @media(max-width:640px){.msg-notice{top:10px;right:16px;left:16px;width:auto}.mobile-nav .nav-badge{position:absolute;top:4px;left:calc(50% + 6px);margin:0;min-width:17px;height:17px;font-size:9px;padding:0 4px}.mobile-nav .nav-button{position:relative}}
 @media(prefers-reduced-motion:reduce){.msg-note{animation:none}}
+/* ---- Multi-chat windows (desktop: side by side; mobile: one sheet + chat heads) ---- */
+.dock-root{position:fixed;right:16px;bottom:0;z-index:90;display:flex;flex-direction:row-reverse;align-items:flex-end;gap:12px;pointer-events:none;max-width:calc(100vw - 32px)}
+.dock-root>*{pointer-events:auto}
+.dock-root .dock-win{position:relative;right:auto;bottom:auto;width:340px;height:min(500px,calc(100dvh - 90px));border-radius:16px 16px 0 0;border-bottom:0;flex-shrink:0}
+.dock-root .dock-win.min{height:58px}
+.dock-root .dock-win.min .dock-log,.dock-root .dock-win.min .dock-tray,.dock-root .dock-win.min .dock-attach,.dock-root .dock-win.min .dock-compose,.dock-root .dock-win.min .notify-ask,.dock-root .dock-win.min .dock-switch{display:none!important}
+.dock-head{cursor:pointer;position:relative}.dock-head .dock-icon{width:30px;height:30px;font-size:15px}
+.win-badge,.chat-head i,.switch-head i{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#e5484d;color:#fff;font-size:10.5px;font-weight:800;display:inline-grid;place-items:center;font-style:normal}
+.dock-head .win-badge{margin-right:2px}
+.dock-heads{display:flex;flex-direction:column-reverse;gap:10px;padding-bottom:18px}
+.dock-heads:empty{display:none}
+.chat-head{position:relative;width:52px;height:52px;border-radius:50%;padding:0;background:var(--panel);border:2px solid color-mix(in srgb,var(--accent) 60%,transparent);box-shadow:0 8px 24px #0008;animation:headIn .25s ease-out}
+.chat-head img,.chat-head .avatar-letter{width:100%;height:100%;border-radius:50%;object-fit:cover;display:grid;place-items:center}
+.chat-head i{position:absolute;top:-4px;right:-4px}
+.chat-head.more{display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--muted);border-style:dashed}
+@keyframes headIn{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.dock-switch{display:flex;gap:8px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--text) 3%,var(--bg));scrollbar-width:none}
+.switch-head{position:relative;width:38px;height:38px;border-radius:50%;padding:0;flex-shrink:0;background:none;border:2px solid var(--line)}
+.switch-head img,.switch-head .avatar-letter{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.switch-head i{position:absolute;top:-5px;right:-6px;min-width:17px;height:17px;font-size:9px;padding:0 4px}
+.notify-ask{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;font-size:11.5px;background:color-mix(in srgb,var(--accent) 9%,var(--bg));border-bottom:1px solid var(--line)}
+.notify-ask span{flex:1;min-width:150px}.notify-ask .text-button{font-size:11.5px}
+@media(max-width:900px){
+ .dock-root{right:0;left:0;max-width:none;display:block}
+ .dock-root .dock-win{position:fixed;left:0;right:0;bottom:0;width:100%;height:min(80dvh,640px);border-radius:18px 18px 0 0;z-index:91}
+ .dock-heads{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));padding:0;z-index:89}
+ body.sheet-open .dock-heads{display:none}
+ .chat-head{width:56px;height:56px}
+}
+@media(min-width:641px) and (max-width:900px){.dock-heads{bottom:24px}}
+@media(prefers-reduced-motion:reduce){.chat-head{animation:none}}
+/* Conversation list with preview + time + unread */
+.conversation .conv-text{flex:1;min-width:0}
+.conversation .conv-text small{max-width:none!important}
+.conv-meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;margin-left:auto}
+.conv-meta small{font-size:10px;color:var(--muted)}
+.conversation.unread b{color:var(--accent-text)}.conversation.unread .conv-text small{color:var(--text);font-weight:600}
+/* Phones/tablets: Tin nhắn = danh sách; bấm một người → khung chat toàn màn hình */
+@media(max-width:900px){
+ .message-layout.list-only{display:block!important;min-height:0}
+ .message-layout.list-only .conversation-list{display:block!important;border:0;padding:6px}
+ .message-layout.list-only .conversation-list h2{margin:8px 10px 6px;font-size:10px}
+ .message-layout.list-only .conversation{width:100%;min-width:0;padding:12px 10px;border-bottom:1px solid var(--line);border-radius:0}
+ .message-layout.list-only .conversation img,.message-layout.list-only .conversation .avatar-letter{width:48px;height:48px}
+ .message-layout.list-only .conversation b{font-size:14px}
+ .message-layout.list-only .conversation .conv-text small{font-size:12px;margin-top:4px}
+ .dock-heads{display:none!important}
+ .dock-root .dock-win{top:var(--vvtop,0);bottom:auto;height:var(--vvh,100dvh);max-height:none;border-radius:0;border:0;padding-bottom:env(safe-area-inset-bottom)}
+ body.sheet-open{overflow:hidden}
+ body.sheet-open .mobile-nav{display:none}
+ .dock-back{font-size:26px!important;line-height:1;background:transparent!important}
+}
+/* iOS zooms into any field under 16px when it gets focus — keep chat & form fields at 16px on touch screens */
+@media(pointer:coarse),(max-width:900px){input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px!important}}
