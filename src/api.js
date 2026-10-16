@@ -33,3 +33,7 @@ export async function adminAuth(payload){return result(await fetch(`${config.api
 // Feedback goes straight to Supabase (cd_feedback_submit is the only browser-callable RPC; rate-limited server side).
 function clientId(){try{let id=localStorage.getItem('chich.client');if(!id){id=crypto.randomUUID();localStorage.setItem('chich.client',id);}return id;}catch{return '';}}
 export async function sendFeedback(body){if(!supabase)throw new Error('Thiếu cấu hình Supabase trong config.js.');const {error}=await supabase.rpc('cd_feedback_submit',{p_body:String(body||'').trim(),p_client:clientId()});if(error)throw new Error(error.message||'Chưa gửi được góp ý.');}
+// Admin: fetch an image from a public link through the Worker (avoids CORS), returned as a File for compression/upload.
+export async function fetchImageURL(url){const r=await fetch(`${config.apiUrl}/admin/fetch-image`,{method:'POST',headers:{authorization:`Bearer ${await token()}`,'content-type':'application/json'},body:JSON.stringify({url})});
+ if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||'Không tải được ảnh từ link này.');}
+ const blob=await r.blob();const ext=blob.type==='image/png'?'png':blob.type==='image/webp'?'webp':'jpg';return new File([blob],`link-image.${ext}`,{type:blob.type});}

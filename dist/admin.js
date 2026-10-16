@@ -1,4 +1,4 @@
-import {api,adminAuth,signIn,signInPassword,signOut,supabase,configured,upload,hero,config} from './api.js';
+import {api,adminAuth,signIn,signInPassword,signOut,supabase,configured,upload,hero,config,fetchImageURL} from './api.js';
 import {preparePhoto} from './album.js';
 import {THEMES,themeById} from './themes.js';
 import {occupations,bodyTypes,lifestyles,trainingStyles} from './model.js';
@@ -240,6 +240,22 @@ async function teasersView(){
  <div class="table-wrap"><table><thead><tr><th style="width:70px">Thứ tự</th><th>Nội dung</th><th style="width:90px">Hiển thị</th><th style="width:170px"></th></tr></thead><tbody>${list.map(t=>`<tr><td><input type="number" value="${t.position}" data-t-pos="${t.id}" style="width:64px" aria-label="Thứ tự"></td><td class="wrap"><textarea data-t-body="${t.id}" maxlength="200" rows="2" style="width:100%" aria-label="Nội dung">${esc(t.body)}</textarea></td><td><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-t-active="${t.id}" ${t.active?'checked':''}> ${t.active?'Đang bật':'Tắt'}</label></td><td><button class="btn" data-t-save="${t.id}">Lưu</button> <button class="btn danger" data-t-del="${t.id}">Xóa</button></td></tr>`).join('')||`<tr><td colspan="4">${empty('Chưa có câu nào.')}</td></tr>`}</tbody></table></div>`;
  $('#t-new').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{await api('admin_teaser_save',{body:f.body.value,active:f.active.checked});toast('Đã thêm câu thả thính.');teasersView();});};
 }
+/* ---------- Image picker: drag & drop, choose from computer, paste an image or an image link ---------- */
+const IMG_ACCEPT='image/jpeg,image/png,image/webp,image/heic,image/heif';
+function dropZone(id,{multiple=false,title='Kéo thả ảnh vào đây'}={}){return `<div class="dropzone" id="${id}" tabindex="0" aria-label="${esc(title)}"><input type="file" accept="${IMG_ACCEPT}" ${multiple?'multiple':''} hidden><div class="dz-main"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><b>${esc(title)}</b><small>hoặc <button type="button" class="link dz-pick">chọn từ máy</button> · dán ảnh (Ctrl+V)</small></div><div class="dz-url"><input type="url" inputmode="url" placeholder="…hoặc dán link ảnh https://" aria-label="Link ảnh"><button type="button" class="btn dz-fetch">Lấy ảnh</button></div><small class="dz-status"></small></div>`;}
+function bindDrop(id,onFiles){const z=document.getElementById(id);if(!z)return;const input=z.querySelector('input[type=file]'),url=z.querySelector('.dz-url input'),status=z.querySelector('.dz-status');
+ const set=t=>{status.textContent=t||'';};let running=false;
+ const run=async files=>{files=files.filter(f=>f&&/^image\//.test(f.type||'image/'));if(!files.length){set('Chỉ nhận ảnh JPG, PNG, WebP hoặc HEIC.');return;}if(running)return;running=true;z.classList.add('busy');try{await onFiles(files,set);}catch(e){set(e.message);toast(e.message);}finally{running=false;z.classList.remove('busy');}};
+ const fromURL=async link=>{link=(link||'').trim();if(!/^https:\/\//i.test(link)){set('Dán link ảnh bắt đầu bằng https://');return;}set('Đang lấy ảnh từ link…');try{const f=await fetchImageURL(link);url.value='';await run([f]);}catch(e){set(e.message);}};
+ z.querySelector('.dz-pick').onclick=e=>{e.stopPropagation();input.click();};
+ z.querySelector('.dz-main').onclick=()=>input.click();
+ input.onchange=()=>{const f=[...input.files];input.value='';run(f);};
+ z.querySelector('.dz-fetch').onclick=()=>fromURL(url.value);
+ url.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();fromURL(url.value);}};
+ ['dragenter','dragover'].forEach(t=>z.addEventListener(t,e=>{e.preventDefault();z.classList.add('over');}));
+ ['dragleave','drop'].forEach(t=>z.addEventListener(t,e=>{e.preventDefault();if(t==='dragleave'&&z.contains(e.relatedTarget))return;z.classList.remove('over');}));
+ z.addEventListener('drop',e=>{const files=[...(e.dataTransfer?.files||[])];if(files.length){run(files);return;}const link=e.dataTransfer?.getData('text/uri-list')||e.dataTransfer?.getData('text/plain');if(link)fromURL(link.split('\n')[0]);});
+ z.addEventListener('paste',e=>{if(e.target===url)return;const files=[...(e.clipboardData?.files||[])];if(files.length){e.preventDefault();run(files);return;}const t=e.clipboardData?.getData('text');if(t&&/^https:\/\//i.test(t.trim())){e.preventDefault();fromURL(t);}});}
 async function settingsView(){
  let h=null,ls={mode:'slide',interval:6,slides:[]};try{h=await hero();}catch{}try{ls={...ls,...(await api('admin_slides'))};ls.slides=ls.slides||[];}catch(e){toast(e.message);}
  const src=id=>`${config.apiUrl}/hero/${encodeURIComponent(id)}`;
@@ -251,18 +267,29 @@ async function settingsView(){
   <form id="ret-form" class="toolbar"><label>Giữ ảnh/video chat <select name="days">${[[0,'Vĩnh viễn'],[30,'30 ngày'],[90,'90 ngày'],[180,'180 ngày'],[365,'1 năm']].map(([v,l])=>`<option value="${v}" ${Number(ls.chatDays||0)===v?'selected':''}>${l}</option>`).join('')}</select></label><button class="btn primary">Lưu</button></form></section>
  <section class="card" style="margin-bottom:18px"><div class="card-head"><div><h2>Trang đăng nhập (nửa bên phải)</h2><p class="sub">Hiện khi khách chưa đăng nhập hoặc vừa đăng xuất. Tối đa 12 ảnh. Ảnh dọc hoặc vuông, chủ thể ở giữa sẽ đẹp nhất.</p></div></div>
   <form id="ls-form" class="toolbar" style="margin-bottom:14px"><label>Kiểu hiển thị <select name="mode"><option value="slide" ${ls.mode==='slide'?'selected':''}>Slide chuyển ảnh</option><option value="single" ${ls.mode==='single'?'selected':''}>Ảnh đơn (ảnh đầu tiên)</option></select></label><label>Mỗi ảnh (giây) <input name="interval" type="number" min="3" max="30" value="${ls.interval}" style="width:80px"></label><button class="btn primary">Lưu cài đặt</button></form>
-  <div class="slide-grid">${ls.slides.map((x,i)=>`<article class="slide-item"><img src="${safeURL(src(x.id))}" alt="Ảnh ${i+1}" loading="lazy"><div class="slide-meta"><label>Thứ tự <input type="number" value="${x.position}" data-s-pos="${x.id}" style="width:64px"></label><button class="btn" data-s-save="${x.id}">Lưu</button><button class="btn danger" data-del="${x.id}">Xóa</button></div>${i===0&&ls.mode==='single'?'<span class="tag hot slide-badge">Đang dùng</span>':''}</article>`).join('')}
-   <label class="slide-add"><input id="slide-files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><span>＋</span><b>Thêm ảnh</b><small id="slide-progress">${ls.slides.length}/12 ảnh</small></label></div>
+  <div class="slide-grid">${ls.slides.map((x,i)=>`<article class="slide-item"><img src="${safeURL(src(x.id))}" alt="Ảnh ${i+1}" loading="lazy"><div class="slide-meta"><label>Thứ tự <input type="number" value="${x.position}" data-s-pos="${x.id}" style="width:64px"></label><button class="btn" data-s-save="${x.id}">Lưu</button><label class="btn">Thay<input type="file" accept="${IMG_ACCEPT}" data-s-replace="${x.id}" data-pos="${x.position}" hidden></label><button class="btn danger" data-del="${x.id}">Xóa</button></div>${i===0&&ls.mode==='single'?'<span class="tag hot slide-badge">Đang dùng</span>':''}</article>`).join('')}</div>
+  <div style="margin-top:14px">${dropZone('slide-drop',{multiple:true,title:`Thêm ảnh trang đăng nhập · đang có ${ls.slides.length}/12`})}</div>
+  <p class="sub" style="margin-top:8px">Kéo một ảnh thả lên ảnh cũ (hoặc bấm "Thay") để thay: ảnh cũ bị xóa luôn khỏi B2.</p>
  </section>
- <section class="card" style="max-width:640px"><h2>Ảnh hero trang Khám phá</h2><p class="sub">Ảnh lớn ở đầu trang Khám phá sau khi đăng nhập.</p><img src="${safeURL(h?.src||'assets/long-1.jpg')}" alt="Ảnh hero hiện tại" id="hero-prev" style="border-radius:10px;margin-bottom:14px;max-height:280px;width:100%;object-fit:cover">
- <form id="hero-form" class="stack"><label for="hero-img">Ảnh mới (JPG/PNG/WebP)</label><input id="hero-img" name="image" type="file" accept="image/jpeg,image/png,image/webp" required><label for="hero-alt">Mô tả ảnh</label><input id="hero-alt" name="alt" maxlength="160" value="${esc(h?.alt||'Sức hút từ cuộc sống đời thường')}"><button class="btn primary">Thay ảnh hero</button></form></section>`;
+ <section class="card" style="max-width:640px"><h2>Ảnh hero trang Khám phá</h2><p class="sub">Ảnh lớn ở đầu trang Khám phá sau khi đăng nhập.</p>${h?.src?`<img src="${safeURL(h.src)}" alt="Ảnh hero hiện tại" id="hero-prev" style="border-radius:10px;margin-bottom:14px;max-height:280px;width:100%;object-fit:cover">`:'<img alt="" id="hero-prev" hidden style="border-radius:10px;margin-bottom:14px;max-height:280px;width:100%;object-fit:cover">'}
+ <form id="hero-form" class="stack">${dropZone('hero-drop',{title:'Ảnh hero mới'})}<label for="hero-alt">Mô tả ảnh</label><input id="hero-alt" name="alt" maxlength="160" value="${esc(h?.alt||'Sức hút từ cuộc sống đời thường')}"><button class="btn primary">Thay ảnh hero</button></form></section>`;
  $('#ret-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{await api('admin_chat_retention',{days:Number(f.days.value)});toast(Number(f.days.value)?`Ảnh/video chat cũ hơn ${f.days.options[f.days.selectedIndex].text} sẽ tự xóa.`:'Giữ ảnh/video chat vĩnh viễn.');});};
  $('#ls-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{await api('admin_login_settings',{mode:f.mode.value,interval:Number(f.interval.value)});toast('Đã lưu cài đặt trang đăng nhập.');settingsView();});};
- $('#slide-files').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;if(files.length+ls.slides.length>12){toast('Tối đa 12 ảnh.');return;}const pr=$('#slide-progress');let n=0;
-  for(const f of files){try{pr.textContent=`Đang nén ảnh ${n+1}/${files.length}…`;const p=await preparePhoto(f);await upload(p.blob,'slide',x=>{pr.textContent=`Đang tải ${n+1}/${files.length} · ${Math.round(x*100)}%`;});n++;}catch(err){toast(`${f.name}: ${err.message}`);}}
-  toast(`Đã thêm ${n} ảnh.`);settingsView();};
- $('#hero-img').onchange=e=>{const f=e.target.files?.[0];if(f)$('#hero-prev').src=URL.createObjectURL(f);};
- $('#hero-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{const p=await preparePhoto(f.image.files[0]);const id=await upload(p.blob,'hero');await api('admin_hero',{id,alt:f.alt.value});toast('Đã thay ảnh hero.');});};
+ bindDrop('slide-drop',async(files,set)=>{if(files.length+ls.slides.length>12){set(`Tối đa 12 ảnh (còn trống ${12-ls.slides.length}).`);return;}let n=0;
+  for(const f of files){try{set(`Đang nén ảnh ${n+1}/${files.length}…`);const p=await preparePhoto(f);await upload(p.blob,'slide',x=>set(`Đang tải ${n+1}/${files.length} · ${Math.round(x*100)}%`));n++;}catch(err){toast(`${f.name}: ${err.message}`);}}
+  toast(`Đã thêm ${n} ảnh.`);settingsView();});
+ const replaceSlide=async(oldId,pos,file)=>{toast('Đang thay ảnh…');const p=await preparePhoto(file);
+  if(ls.slides.length>=12)await api('admin_delete_media',{id:oldId});
+  const id=await upload(p.blob,'slide');await api('admin_slide_order',{id,position:pos});
+  if(ls.slides.length<12)await api('admin_delete_media',{id:oldId});
+  toast('Đã thay ảnh, ảnh cũ đã xóa khỏi B2.');settingsView();};
+ document.querySelectorAll('[data-s-replace]').forEach(inp=>inp.onchange=()=>{const f=inp.files?.[0];if(f)replaceSlide(inp.dataset.sReplace,Number(inp.dataset.pos)||0,f).catch(e=>toast(e.message));});
+ document.querySelectorAll('.slide-item').forEach(card=>{const inp=card.querySelector('[data-s-replace]');if(!inp)return;
+  card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('over');});card.addEventListener('dragleave',()=>card.classList.remove('over'));
+  card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('over');const f=[...(e.dataTransfer?.files||[])].find(x=>x.type.startsWith('image/'));if(f)replaceSlide(inp.dataset.sReplace,Number(inp.dataset.pos)||0,f).catch(err=>toast(err.message));});});
+ let heroFile=null;
+ bindDrop('hero-drop',async(files,set)=>{heroFile=files[0];const prev=$('#hero-prev');prev.src=URL.createObjectURL(heroFile);prev.hidden=false;set(`Đã chọn ${heroFile.name}. Bấm "Thay ảnh hero" để lưu.`);});
+ $('#hero-form').onsubmit=e=>{e.preventDefault();const f=e.target;if(!heroFile){toast('Chọn, kéo thả hoặc dán link ảnh hero trước.');return;}busy(f,async()=>{const p=await preparePhoto(heroFile);const id=await upload(p.blob,'hero');await api('admin_hero',{id,alt:f.alt.value});heroFile=null;toast('Đã thay ảnh hero, ảnh cũ đã xóa khỏi B2.');settingsView();});};
 }
 
 /* ---------------- Illustration profiles (Hồ sơ minh họa) ---------------- */
@@ -287,15 +314,18 @@ async function samplesView(){
    <form id="sp-gen" class="toolbar" style="gap:6px"><label>Tạo nhanh <input name="n" type="number" min="1" max="100" value="${Math.max(1,Math.min(100,50-sampleList.length))||10}" style="width:70px"> hồ sơ (chỉ chữ)</label><button class="btn">Tạo</button></form>
    <label class="btn" title="Chọn nhiều ảnh: gắn lần lượt cho các hồ sơ chưa có ảnh">🖼 Gắn ảnh hàng loạt<input id="sp-bulk" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>
    <button class="btn danger" id="sp-clear" ${sampleList.length?'':'disabled'}>Xóa tất cả</button>
-   <small class="muted" id="sp-progress"></small></div></section>
+   <small class="muted" id="sp-progress"></small></div>
+  <div style="margin-top:12px">${dropZone('sp-drop',{multiple:true,title:'Kéo thả nhiều ảnh: gắn lần lượt cho hồ sơ chưa có ảnh'})}</div></section>
  <div class="slide-grid">${sampleList.map(x=>{const m=x.photos?.[0];return `<article class="slide-item sample-item ${x.active?'':'off'}">${m?`<img src="${safeURL(m.thumb||m.src)}" alt="" loading="lazy">`:`<div class="sample-ph">${esc(x.name[0])}<small>Chưa có ảnh</small></div>`}<div class="slide-meta" style="display:block"><b>${esc(x.name)}, ${x.age}</b><div class="muted small">${esc(x.city)}${x.active?'':' · đang ẩn'}</div><div class="toolbar" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn" data-sp-edit="${x.id}">Sửa</button><label class="btn">Ảnh<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" data-sp-photo="${x.id}" hidden></label><button class="btn danger" data-sp-del="${x.id}">Xóa</button></div></div></article>`;}).join('')||empty('Chưa có hồ sơ minh họa. Bấm "Tạo nhanh" để có sẵn nội dung, rồi gắn ảnh.')}</div>`;
  $('#sp-on').onchange=async e=>{try{await api('admin_samples_toggle',{enabled:e.target.checked});toast(e.target.checked?'Đã bật hồ sơ minh họa.':'Đã tắt hồ sơ minh họa.');samplesView();}catch(err){toast(err.message);}};
  $('#sp-add').onclick=()=>sampleForm(null,opt);
  $('#sp-gen').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{const r=await api('admin_samples_bulk',{items:sampleDraft(Math.max(1,Math.min(100,Number(f.n.value)||1)))});toast(`Đã tạo ${r.count} hồ sơ. Sửa nội dung và gắn ảnh tùy ý.`);samplesView();});};
  $('#sp-clear').onclick=async e=>{if(!confirmInline(e.target,'Bấm lần nữa để xóa hết'))return;try{await api('admin_samples_clear');toast('Đã xóa tất cả hồ sơ minh họa và ảnh của chúng.');samplesView();}catch(err){toast(err.message);}};
- $('#sp-bulk').onchange=async e=>{const files=[...e.target.files];e.target.value='';const targets=sampleList.filter(x=>!x.photos?.length);if(!files.length)return;if(!targets.length){toast('Mọi hồ sơ đều đã có ảnh.');return;}
+ const bulk=async files=>{const targets=sampleList.filter(x=>!x.photos?.length);if(!files.length)return;if(!targets.length){toast('Mọi hồ sơ đều đã có ảnh.');return;}
   const pr=$('#sp-progress');let n=0;for(const [i,f] of files.slice(0,targets.length).entries()){try{pr.textContent=`Đang xử lý ảnh ${i+1}/${Math.min(files.length,targets.length)}…`;await samplePhoto(targets[i],f,x=>{pr.textContent=`Đang tải ${i+1}/${Math.min(files.length,targets.length)} · ${Math.round(x*100)}%`;});n++;}catch(err){toast(`${f.name}: ${err.message}`);}}
   toast(`Đã gắn ${n} ảnh${files.length>targets.length?` (bỏ qua ${files.length-targets.length} ảnh thừa)`:''}.`);samplesView();};
+ $('#sp-bulk').onchange=e=>{const f=[...e.target.files];e.target.value='';bulk(f);};
+ bindDrop('sp-drop',files=>bulk(files));
  document.querySelectorAll('[data-sp-photo]').forEach(inp=>inp.onchange=async e=>{const f=e.target.files?.[0];if(!f)return;const x=sampleList.find(s=>s.id===inp.dataset.spPhoto);try{$('#sp-progress').textContent=`Đang tải ảnh cho ${x.name}…`;await samplePhoto(x,f);toast('Đã đổi ảnh.');}catch(err){toast(err.message);}samplesView();});
  document.querySelectorAll('[data-sp-edit]').forEach(b=>b.onclick=()=>sampleForm(sampleList.find(s=>s.id===b.dataset.spEdit),opt));
  document.querySelectorAll('[data-sp-del]').forEach(b=>b.onclick=async()=>{if(!confirmInline(b,'Bấm lần nữa'))return;try{await api('admin_sample_delete',{id:b.dataset.spDel});toast('Đã xóa.');samplesView();}catch(err){toast(err.message);}});
@@ -309,10 +339,11 @@ function sampleForm(x,opt){
  <label>Nghề nghiệp<select name="occupation">${opt(occupations,x?.occupation)}</select></label><label>Vóc dáng<select name="bodyType">${opt(bodyTypes,x?.bodyType)}</select></label>
  <label>Lối sống<select name="lifestyle">${opt(lifestyles,x?.lifestyle)}</select></label><label>Cách vận động<select name="training">${opt(trainingStyles,x?.training)}</select></label>
  <label>Mong muốn kết nối<select name="intent">${opt(INTENTS,x?.intent)}</select></label><label>Giới thiệu<textarea name="bio" maxlength="400" rows="3">${esc(x?.bio||'')}</textarea></label>
- <label>Ảnh ${x?.photos?.length?'(để trống nếu giữ ảnh cũ)':''}<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"></label>
+ <div><span class="muted small">Ảnh ${x?.photos?.length?'(để trống nếu giữ ảnh cũ; ảnh cũ sẽ bị xóa khỏi B2 khi thay)':''}</span><img id="sp-prev" alt="" hidden style="width:120px;aspect-ratio:3/4;object-fit:cover;border-radius:10px;margin:8px 0">${dropZone('sp-form-drop',{title:'Ảnh hồ sơ minh họa'})}</div>
  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="active" ${x?.active===false?'':'checked'}> Hiển thị hồ sơ này</label><button class="btn primary">Lưu</button></form>`);
+ let spFile=null;bindDrop('sp-form-drop',async(files,set)=>{spFile=files[0];const pv=$('#sp-prev');pv.src=URL.createObjectURL(spFile);pv.hidden=false;set(`Đã chọn ${spFile.name}.`);});
  $('#sp-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{const data={...(x?{id:x.id,position:x.position}:{}),name:f.name.value,age:Number(f.age.value),city:f.city.value,occupation:f.occupation.value,bodyType:f.bodyType.value,lifestyle:f.lifestyle.value,training:f.training.value,intent:f.intent.value,bio:f.bio.value,active:f.active.checked};
-  const file=f.photo.files?.[0];if(file){const p=await preparePhoto(file);data.mediaId=await upload(p.blob,'sample',null,p.thumb);}
+  const file=spFile;if(file){const p=await preparePhoto(file);data.mediaId=await upload(p.blob,'sample',null,p.thumb);}
   await api('admin_sample_save',data);toast('Đã lưu.');closeDrawer();samplesView();});};
 }
 

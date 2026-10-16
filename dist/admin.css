@@ -124,3 +124,13 @@ dialog::backdrop{background:rgba(3,8,15,.7)}
 .sample-item .sample-ph small{font-size:11px;font-weight:400;color:var(--muted)}
 .switch-line{display:flex;align-items:center;gap:8px;cursor:pointer}.switch-line input{width:18px;height:18px;accent-color:var(--orange)}
 .sp-form>label{display:grid;gap:6px;font-size:12px;color:var(--muted)}.sp-form>label input:not([type=checkbox]),.sp-form>label select,.sp-form>label textarea{width:100%;color:var(--text)}.sp-form>label:has(input[type=checkbox]){display:flex}
+/* Image picker: drag & drop / choose / paste / link */
+.dropzone{border:1.5px dashed #4a5a70;border-radius:14px;padding:16px;display:grid;gap:12px;background:var(--panel2);transition:border-color .15s,background .15s;outline:none}
+.dropzone:focus-visible,.dropzone.over{border-color:var(--orange);background:color-mix(in srgb,var(--orange) 8%,var(--panel2))}
+.dropzone.busy{opacity:.7;pointer-events:none}
+.dz-main{display:grid;justify-items:center;gap:4px;text-align:center;cursor:pointer;color:var(--muted);padding:6px}
+.dz-main svg{color:var(--orange)}.dz-main b{color:var(--text);font-size:13px}.dz-main small{font-size:12px}
+.dz-main .link{background:none;border:0;padding:0;color:var(--orange);font:inherit;cursor:pointer;text-decoration:underline}
+.dz-url{display:flex;gap:8px}.dz-url input{flex:1;min-width:0}
+.dz-status{font-size:12px;color:var(--muted);min-height:1em}
+.slide-item.over{outline:2px solid var(--orange);outline-offset:2px}

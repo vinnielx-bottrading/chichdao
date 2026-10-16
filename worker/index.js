@@ -137,7 +137,23 @@ async function authAdmin(req,env,user){
  await rpc(env,user.id,'admin_audit_add',{action:op==='create'?'create_user':'update_auth',target,detail:{email:email||null,passwordChanged:!!password}});
  return json({id:target,email:result.email||email});
 }
-async function handle(req,env){
+// Delete files that the database has just marked for removal (replaced hero/illustration photos etc.) right away,
+// instead of waiting for the next cron run.
+async function cleanupNow(env){if(!storageMode(env))return;for(const m of await rpc(env,null,'cleanup_list'))await deleteObject(env,m).catch(()=>{});}
+const CLEANUP_AFTER=new Set(['admin_hero','admin_sample_save','admin_sample_delete','admin_samples_clear']);
+// Admin only: download an image from a public https URL so the admin page can compress and upload it
+// (browsers cannot read most other sites' images directly because of CORS).
+async function fetchImage(req,env,user){
+ const me=await rpc(env,user.id,'me',{});if(!me.admin)throw new HttpError(403,'Chỉ quản trị viên được thực hiện.');
+ const {url}=await jsonBody(req);let u;try{u=new URL(String(url||''));}catch{throw new HttpError(400,'Link ảnh không hợp lệ.');}
+ if(u.protocol!=='https:'||/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/i.test(u.hostname)||u.hostname.endsWith('.local'))throw new HttpError(400,'Chỉ nhận link ảnh https công khai.');
+ const r=await fetch(u.href,{redirect:'follow',headers:{accept:'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8','user-agent':'CHICHDAO-ImageFetch/1.0'}}).catch(()=>null);
+ if(!r||!r.ok)throw new HttpError(400,'Không tải được ảnh từ link này.');
+ const bytes=await boundedBody(r,30*1024*1024).catch(()=>{throw new HttpError(413,'Ảnh vượt 30 MB.');});
+ const mime=sniffMime(bytes);if(!mime.startsWith('image/'))throw new HttpError(415,'Link không phải ảnh JPG, PNG hoặc WebP.');
+ return new Response(bytes,{headers:{'content-type':mime,'cache-control':'no-store'}});
+}
+async function handle(req,env,ctx){
  const url=new URL(req.url),path=url.pathname;
  if(req.method==='GET'&&path==='/health')return json({ready:validConfig(env),storage:storageMode(env)||'none'});
  if(!validConfig(env))throw new HttpError(503,'Dịch vụ đang được chuẩn bị. Vui lòng quay lại sau.');
@@ -156,9 +172,10 @@ async function handle(req,env){
   if(!clientAction(action))throw new HttpError(400,'Thao tác không hợp lệ.');
   const payload={...(data&&typeof data==='object'&&!Array.isArray(data)?data:{})};delete payload._geo;payload._geo=geo(req);
   if(action==='admin_delete_media'){const m=await rpc(env,user.id,'admin_delete_media',payload);await deleteObject(env,m).catch(()=>{});return json({deleted:true});}
-  const result=await rpc(env,user.id,action,payload);return json(await hydrate(result,user.id,url.origin,env));
+  const result=await rpc(env,user.id,action,payload);if(CLEANUP_AFTER.has(action))ctx?.waitUntil?.(cleanupNow(env).catch(()=>{}));return json(await hydrate(result,user.id,url.origin,env));
  }
  if(req.method==='POST'&&path==='/admin/auth')return authAdmin(req,env,user);
+ if(req.method==='POST'&&path==='/admin/fetch-image')return fetchImage(req,env,user);
  if(req.method==='POST'&&path==='/uploads'){
   requireStorage(env);
   const data=await jsonBody(req);const m=await rpc(env,user.id,'reserve_media',data);return json({id:m.id,uploadUrl:`${url.origin}/uploads/${m.id}`});
@@ -190,12 +207,12 @@ async function handle(req,env){
  throw new HttpError(404,'Không tìm thấy trang.');
 }
 export default {
- async fetch(req,env){
+ async fetch(req,env,ctx){
   const origin=req.headers.get('origin'),allowed=origin&&allowedOrigin(origin,env);
   if(origin&&!allowed)return json({error:'Origin không được phép.'},403);
   let response;
   if(req.method==='OPTIONS')response=new Response(null,{status:204});
-  else try{response=await handle(req,env);}catch(e){response=json({error:e instanceof HttpError?e.message:'Dịch vụ tạm thời gián đoạn. Vui lòng thử lại.'},e.status||500);}
+  else try{response=await handle(req,env,ctx);}catch(e){response=json({error:e instanceof HttpError?e.message:'Dịch vụ tạm thời gián đoạn. Vui lòng thử lại.'},e.status||500);}
   const headers=new Headers(response.headers);
   if(allowed){headers.set('access-control-allow-origin',origin);headers.set('vary','Origin');headers.set('access-control-allow-methods','GET, POST, PUT, DELETE, OPTIONS');headers.set('access-control-allow-headers','Authorization, Content-Type, Range');headers.set('access-control-expose-headers','Content-Range, Accept-Ranges');headers.set('access-control-max-age','600');}
   headers.set('x-content-type-options','nosniff');headers.set('referrer-policy','no-referrer');

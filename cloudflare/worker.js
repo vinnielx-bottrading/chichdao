@@ -490,7 +490,33 @@ async function authAdmin(req, env, user) {
   await rpc(env, user.id, "admin_audit_add", { action: op === "create" ? "create_user" : "update_auth", target, detail: { email: email || null, passwordChanged: !!password } });
   return json({ id: target, email: result.email || email });
 }
-async function handle(req, env) {
+async function cleanupNow(env) {
+  if (!storageMode(env)) return;
+  for (const m of await rpc(env, null, "cleanup_list")) await deleteObject(env, m).catch(() => {
+  });
+}
+var CLEANUP_AFTER = /* @__PURE__ */ new Set(["admin_hero", "admin_sample_save", "admin_sample_delete", "admin_samples_clear"]);
+async function fetchImage(req, env, user) {
+  const me = await rpc(env, user.id, "me", {});
+  if (!me.admin) throw new HttpError(403, "Ch\u1EC9 qu\u1EA3n tr\u1ECB vi\xEAn \u0111\u01B0\u1EE3c th\u1EF1c hi\u1EC7n.");
+  const { url } = await jsonBody(req);
+  let u;
+  try {
+    u = new URL(String(url || ""));
+  } catch {
+    throw new HttpError(400, "Link \u1EA3nh kh\xF4ng h\u1EE3p l\u1EC7.");
+  }
+  if (u.protocol !== "https:" || /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/i.test(u.hostname) || u.hostname.endsWith(".local")) throw new HttpError(400, "Ch\u1EC9 nh\u1EADn link \u1EA3nh https c\xF4ng khai.");
+  const r = await fetch(u.href, { redirect: "follow", headers: { accept: "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8", "user-agent": "CHICHDAO-ImageFetch/1.0" } }).catch(() => null);
+  if (!r || !r.ok) throw new HttpError(400, "Kh\xF4ng t\u1EA3i \u0111\u01B0\u1EE3c \u1EA3nh t\u1EEB link n\xE0y.");
+  const bytes = await boundedBody(r, 30 * 1024 * 1024).catch(() => {
+    throw new HttpError(413, "\u1EA2nh v\u01B0\u1EE3t 30 MB.");
+  });
+  const mime = sniffMime(bytes);
+  if (!mime.startsWith("image/")) throw new HttpError(415, "Link kh\xF4ng ph\u1EA3i \u1EA3nh JPG, PNG ho\u1EB7c WebP.");
+  return new Response(bytes, { headers: { "content-type": mime, "cache-control": "no-store" } });
+}
+async function handle(req, env, ctx) {
   const url = new URL(req.url), path = url.pathname;
   if (req.method === "GET" && path === "/health") return json({ ready: validConfig(env), storage: storageMode(env) || "none" });
   if (!validConfig(env)) throw new HttpError(503, "D\u1ECBch v\u1EE5 \u0111ang \u0111\u01B0\u1EE3c chu\u1EA9n b\u1ECB. Vui l\xF2ng quay l\u1EA1i sau.");
@@ -522,9 +548,12 @@ async function handle(req, env) {
       return json({ deleted: true });
     }
     const result = await rpc(env, user.id, action, payload);
+    if (CLEANUP_AFTER.has(action)) ctx?.waitUntil?.(cleanupNow(env).catch(() => {
+    }));
     return json(await hydrate(result, user.id, url.origin, env));
   }
   if (req.method === "POST" && path === "/admin/auth") return authAdmin(req, env, user);
+  if (req.method === "POST" && path === "/admin/fetch-image") return fetchImage(req, env, user);
   if (req.method === "POST" && path === "/uploads") {
     requireStorage(env);
     const data = await jsonBody(req);
@@ -571,13 +600,13 @@ async function handle(req, env) {
   throw new HttpError(404, "Kh\xF4ng t\xECm th\u1EA5y trang.");
 }
 var index_default = {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const origin = req.headers.get("origin"), allowed = origin && allowedOrigin(origin, env);
     if (origin && !allowed) return json({ error: "Origin kh\xF4ng \u0111\u01B0\u1EE3c ph\xE9p." }, 403);
     let response;
     if (req.method === "OPTIONS") response = new Response(null, { status: 204 });
     else try {
-      response = await handle(req, env);
+      response = await handle(req, env, ctx);
     } catch (e) {
       response = json({ error: e instanceof HttpError ? e.message : "D\u1ECBch v\u1EE5 t\u1EA1m th\u1EDDi gi\xE1n \u0111o\u1EA1n. Vui l\xF2ng th\u1EED l\u1EA1i." }, e.status || 500);
     }
