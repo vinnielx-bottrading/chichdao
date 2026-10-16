@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import worker,{boundedBody,sniffMime,signMedia,verifyMedia,allowedOrigin,hydrate,storageMode,deviceLabel,b2Endpoint} from '../worker/index.js';
+import worker,{boundedBody,sniffMime,signMedia,verifyMedia,allowedOrigin,hydrate,storageMode,deviceLabel,b2Endpoint,clientAction} from '../worker/index.js';
 const uid='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',third='33333333-3333-4333-8333-333333333333',adminId='44444444-4444-4444-8444-444444444444';
 test('database authorization, album limits, nearby privacy and ownership',async()=>{
  const db=new PGlite();
@@ -64,7 +64,15 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  assert.equal((await rpc(other,'media_file',{id:cm.id})).id,cm.id);
  await assert.rejects(()=>rpc(third,'media_file',{id:cm.id}),/Không tìm/);
  assert.equal((await rpc(uid,'me')).photos.length,12);
- assert.equal((await rpc(other,'messages',{id:uid})).length,2);
+ // Thả thính: admin-written lines, sent as kind='tease'; free text cannot be passed off as a teaser
+ const teasers=await rpc(uid,'teasers');assert.ok(teasers.length>=5);
+ await rpc(uid,'send',{id:other,teaserId:teasers[0].id,text:'ignored'});
+ const t2=await rpc(other,'messages',{id:uid});assert.equal(t2.at(-1).kind,'tease');assert.equal(t2.at(-1).body,teasers[0].body);
+ await assert.rejects(()=>rpc(uid,'send',{id:other,teaserId:'99999999-9999-4999-8999-999999999999'}),/không còn khả dụng/);
+ // Worldwide free-text region, accent-insensitive contains match
+ assert.equal((await rpc(uid,'discover',{city:'ha noi'})).length,2);
+ assert.equal((await rpc(uid,'discover',{city:'Bangkok'})).length,0);
+ assert.equal((await rpc(other,'messages',{id:uid})).length,3);
  assert.equal((await rpc(third,'messages',{id:uid})).length,0);
  await rpc(other,'block',{id:uid});
  await assert.rejects(async()=>rpc(uid,'media_file',{id:(await rpc(other,'me')).photos[0].id}),/Không tìm/);
@@ -86,7 +94,7 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  assert.equal((await rpc(uid,'me')).appInstalled,false);await rpc(uid,'app_installed',{_geo:{country:'VN'}});assert.equal((await rpc(uid,'me')).appInstalled,true);
  assert.match((await rpc(uid,'reserve_media',{kind:'video',bytes:15,mime:'video/webm'}).catch(e=>({object_key:e.message}))).object_key,/giới hạn|^users\/.+\/videos\/.+\.webm$/);
  const stats=await rpc(adminId,'admin_stats');
- assert.equal(stats.totals.users,4);assert.equal(stats.totals.installed,1);assert.equal(stats.totals.messages,2);assert.equal(stats.totals.chatMedia,1);assert.equal(stats.signups.length,30);
+ assert.equal(stats.totals.users,4);assert.equal(stats.totals.installed,1);assert.equal(stats.totals.messages,3);assert.equal(stats.totals.teases,1);assert.equal(stats.totals.chatMedia,1);assert.equal(stats.signups.length,30);
  assert.ok(stats.geoCity.some(x=>x.label==='Hanoi'));
  const users=await rpc(adminId,'admin_users',{query:'b@example'});
  assert.equal(users.length,1);assert.equal(users[0].email,'b@example.test');
@@ -103,10 +111,26 @@ test('database authorization, album limits, nearby privacy and ownership',async(
  await assert.rejects(()=>rpc(third,'me'),/không khả dụng/);
  await rpc(adminId,'admin_suspend',{id:third,suspended:false});
  await assert.rejects(()=>rpc(adminId,'admin_suspend',{id:adminId}),/quản trị/);
+ await assert.rejects(()=>rpc(uid,'admin_teaser_save',{body:'x'}),/Forbidden/);
+ const nt=await rpc(adminId,'admin_teaser_save',{body:'Câu mới 🔥',position:0});
+ assert.equal((await rpc(uid,'teasers'))[0].body,'Câu mới 🔥');
+ await rpc(adminId,'admin_teaser_save',{id:nt.id,body:'Câu mới 🔥',active:false});
+ assert.ok(!(await rpc(uid,'teasers')).some(t=>t.id===nt.id));
+ assert.ok((await rpc(adminId,'admin_teasers')).some(t=>t.id===nt.id&&t.active===false));
+ await rpc(adminId,'admin_teaser_delete',{id:nt.id});
  const audit=await rpc(adminId,'admin_audit');
  assert.ok(['view_user','view_chat','suspend'].every(a=>audit.some(x=>x.action===a)));
  const hero=await rpc(adminId,'reserve_media',{kind:'image',purpose:'hero',mime:'image/jpeg',bytes:15});
- assert.equal(hero.object_key,`site/hero/${hero.id}.jpg`);await rpc(adminId,'claim_media',{id:hero.id});await rpc(adminId,'finish_media',{id:hero.id});await rpc(adminId,'admin_hero',{id:hero.id,alt:'Vườn cây'});
+ assert.equal(hero.object_key,`site/hero/${hero.id}.jpg`);
+ // Sign-in page slides: admin-only uploads, public reads, settings
+ await assert.rejects(()=>rpc(uid,'reserve_media',{kind:'image',purpose:'slide',mime:'image/jpeg',bytes:15}),/Forbidden/);
+ const sl=await rpc(adminId,'reserve_media',{kind:'image',purpose:'slide',mime:'image/jpeg',bytes:15});assert.equal(sl.object_key,`site/login/${sl.id}.jpg`);
+ await rpc(adminId,'claim_media',{id:sl.id});await rpc(adminId,'finish_media',{id:sl.id});
+ await rpc(adminId,'admin_login_settings',{mode:'single',interval:99});
+ const pub=await rpc(null,'hero');assert.deepEqual(pub.slides,[sl.id]);assert.equal(pub.loginMode,'single');assert.equal(pub.loginInterval,30);
+ assert.equal((await rpc(null,'hero_file',{id:sl.id})).id,sl.id);
+ assert.equal((await rpc(adminId,'admin_slides')).slides.length,1);
+ await assert.rejects(()=>rpc(uid,'admin_slides'),/Forbidden/);await rpc(adminId,'claim_media',{id:hero.id});await rpc(adminId,'finish_media',{id:hero.id});await rpc(adminId,'admin_hero',{id:hero.id,alt:'Vườn cây'});
  assert.equal((await rpc(null,'hero')).mediaId,hero.id);
  await assert.rejects(()=>rpc(null,'hero_file',{id:first.id}),/Không tìm/);
  await rpc(uid,'delete_media',{id:first.id});await rpc(null,'cleanup_done',{id:first.id});
@@ -135,6 +159,7 @@ test('worker helpers: nested media signing, optional storage, device label',asyn
  const out=await hydrate({profile:{photos:[{id:uid,kind:'image'}]},media:[{id:other,status:'pending'}]},third,'https://api.test',env);
  assert.match(out.profile.photos[0].src,/^https:\/\/api\.test\/media\//);
  assert.equal(out.media[0].src,undefined);
+ assert.equal(clientAction('teasers'),true);assert.equal(clientAction('admin_teaser_save'),true);for(const a of ['media_file','admin_audit_add','claim_media','cleanup_done','hero_file','x;drop'])assert.equal(clientAction(a),false);
  assert.equal(storageMode({}),'');assert.equal(storageMode({B2_BUCKET:'b',B2_REGION:'us-west-004',B2_KEY_ID:'k',B2_APPLICATION_KEY:'s'}),'b2');assert.equal(b2Endpoint({B2_REGION:'us-west-004'}),'https://s3.us-west-004.backblazeb2.com');assert.equal(b2Endpoint({B2_REGION:'s3.ca-east-006.backblazeb2.com'}),'https://s3.ca-east-006.backblazeb2.com');assert.equal(b2Endpoint({B2_REGION:'https://s3.ca-east-006.backblazeb2.com/'}),'https://s3.ca-east-006.backblazeb2.com');
  assert.equal(deviceLabel('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit Version/17 Mobile Safari/604.1'),'iOS · Safari');
  const core={SUPABASE_URL:'x',SUPABASE_SERVICE_ROLE_KEY:'x',MEDIA_SIGNING_SECRET:'x',ALLOWED_ORIGINS:'https://a.test'};
@@ -160,4 +185,28 @@ test('upload goes to Backblaze B2 with SigV4, SSE and the users/<uid>/images lay
   const auth=calls.find(r=>r.url.endsWith('/auth/v1/user'));assert.equal(auth.headers.get('apikey'),'sb_secret_x');
   const rpcCall=calls.find(r=>r.url.endsWith('/rpc/cd_api'));assert.equal(rpcCall.headers.get('authorization'),null);
  }finally{globalThis.fetch=real;}
+});
+
+test('upgrade-v0.6.sql upgrades a live v0.5 database without losing data',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+  create schema auth; create table auth.users(id uuid primary key,email text,raw_app_meta_data jsonb default '{}',created_at timestamptz default now(),last_sign_in_at timestamptz,email_confirmed_at timestamptz default now());grant usage on schema auth to service_role;
+  insert into auth.users(id,email) values ('${uid}','a@example.test'),('${other}','b@example.test');`);
+  await db.exec(await readFile(new URL('./fixtures/v0.5-schema.sql',import.meta.url),'utf8'));
+  await db.exec('set role service_role');
+  const rpc=async(actor,action,data={})=>(await db.query('select public.cd_api($1,$2,$3::jsonb) as value',[actor,action,JSON.stringify(data)])).rows[0].value;
+  await rpc(uid,'accept_adult');await rpc(uid,'profile_save',{name:'Anh A',age:30,city:'Hà Nội',intent:'x',bio:'Mình thích những câu chuyện chân thành.'});
+  await db.exec('reset role');
+  await db.exec(await readFile(new URL('../supabase/upgrade-v0.6.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/upgrade-v0.6.sql',import.meta.url),'utf8')); // re-runnable
+  await db.exec(await readFile(new URL('../supabase/upgrade-v0.7.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/upgrade-v0.7.sql',import.meta.url),'utf8'));
+  await db.exec('set role service_role');
+  assert.equal((await rpc(uid,'me')).name,'Anh A');
+  assert.equal((await rpc(uid,'teasers')).length,6);
+  assert.equal((await rpc(null,'hero')).loginMode,'slide');
+  await db.exec('reset role;set role anon');
+  await assert.rejects(()=>db.query('select * from public.cd_teasers'),/permission denied/);
+ }finally{await db.close();}
 });

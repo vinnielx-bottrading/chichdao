@@ -1,4 +1,4 @@
-import {api,adminAuth,signIn,signInPassword,signOut,supabase,configured,upload,hero} from './api.js';
+import {api,adminAuth,signIn,signInPassword,signOut,supabase,configured,upload,hero,config} from './api.js';
 import {preparePhoto} from './album.js';
 
 const $=s=>document.querySelector(s);
@@ -9,10 +9,10 @@ const dt=s=>s?new Date(s).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',
 const ago=s=>{if(!s)return '—';const m=Math.round((Date.now()-new Date(s))/60000);if(m<1)return 'vừa xong';if(m<60)return `${m} phút trước`;const h=Math.round(m/60);if(h<48)return `${h} giờ trước`;return `${Math.round(h/24)} ngày trước`;};
 const bytes=b=>b>1048576?`${(b/1048576).toFixed(1)} MB`:`${Math.round((b||0)/1024)} KB`;
 const place=(o)=>[o.city||o.lastCity||o.last_city,o.country||o.lastCountry||o.last_country].filter(Boolean).join(', ')||'—';
-const EVENTS={SIGNED_IN:'Đăng nhập',INITIAL_SESSION:'Mở ứng dụng',session:'Mở ứng dụng',USER_UPDATED:'Cập nhật tài khoản',logout:'Đăng xuất',accept_adult:'Xác nhận 18+',profile_save:'Lưu hồ sơ',visibility:'Đổi hiển thị',location:'Bật vị trí',location_off:'Tắt vị trí',like:'Thích',unlike:'Bỏ thích',block:'Chặn',unblock:'Bỏ chặn',report:'Báo cáo',send:'Gửi tin nhắn',finish_media:'Tải ảnh/video',app_installed:'Cài ứng dụng',delete_media:'Xóa ảnh/video'};
-const AUDIT={view_user:'Xem hồ sơ',view_chat:'Đọc hội thoại',suspend:'Khóa/mở khóa',delete_media:'Xóa media',resolve_report:'Xử lý báo cáo',create_user:'Tạo người dùng',update_auth:'Đổi email/mật khẩu'};
+const EVENTS={SIGNED_IN:'Đăng nhập',INITIAL_SESSION:'Mở ứng dụng',session:'Mở ứng dụng',USER_UPDATED:'Cập nhật tài khoản',logout:'Đăng xuất',accept_adult:'Xác nhận 18+',profile_save:'Lưu hồ sơ',visibility:'Đổi hiển thị',location:'Bật vị trí',location_off:'Tắt vị trí',like:'Thích',unlike:'Bỏ thích',block:'Chặn',unblock:'Bỏ chặn',report:'Báo cáo',send:'Gửi tin nhắn',finish_media:'Tải ảnh/video',tease:'Thả thính 🔥',app_installed:'Cài ứng dụng',delete_media:'Xóa ảnh/video'};
+const AUDIT={view_user:'Xem hồ sơ',view_chat:'Đọc hội thoại',suspend:'Khóa/mở khóa',delete_media:'Xóa media',resolve_report:'Xử lý báo cáo',create_user:'Tạo người dùng',teaser_save:'Lưu câu thả thính',login_settings:'Cài đặt trang đăng nhập',teaser_delete:'Xóa câu thả thính',update_auth:'Đổi email/mật khẩu'};
 const ev=e=>EVENTS[e]||e;
-const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['audit','Nhật ký admin'],['settings','Cài đặt']];
+const TABS=[['overview','Tổng quan'],['users','Người dùng'],['chats','Tin nhắn'],['media','Ảnh & video'],['activity','Hoạt động'],['reports','Báo cáo'],['teasers','Thả thính 🔥'],['audit','Nhật ký admin'],['settings','Cài đặt']];
 
 let me=null,tab='overview',charts=[],stats=null,authBusy=false,lastToken='';
 const state={users:{q:'',filter:'all',rows:[],done:false},media:{kind:'all',purpose:'all',rows:[],done:false},activity:{event:'all',rows:[],done:false},chats:{rows:[],a:'',b:'',done:false}};
@@ -53,6 +53,7 @@ async function render(){
   if(tab==='activity')await activity(true);
   if(tab==='reports')await reports();
   if(tab==='audit')await audit();
+  if(tab==='teasers')await teasersView();
   if(tab==='settings')settingsView();
  }catch(e){v.innerHTML=empty(e.message);}
 }
@@ -79,7 +80,7 @@ async function overview(){
  const AGE=['18–24','25–29','30–34','35–39','40–49','50+','Chưa có'];stats.age=[...(stats.age||[])].sort((x,y)=>AGE.indexOf(x.label)-AGE.indexOf(y.label));
  const k=(label,value,sub='')=>`<div class="kpi"><span>${label}</span><b>${num(value)}</b>${sub?`<small>${sub}</small>`:''}</div>`;
  $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">TỔNG QUAN</span><h1>Bảng điều khiển</h1><p>Số liệu thời gian thực từ cơ sở dữ liệu · 30 ngày gần nhất theo giờ Việt Nam.</p></div><button class="btn" id="refresh">Làm mới</button></div>
- <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}${k('Đã cài app',t.installed)}${k('Ảnh/video trong chat',t.chatMedia)}</div>
+ <div class="kpis">${k('Tài khoản đăng ký',t.users,`${num(t.complete)} hồ sơ hoàn thiện`)}${k('Hoạt động 24 giờ',t.active24h,`${num(t.active7d)} trong 7 ngày`)}${k('Tin nhắn',t.messages,`${num(t.messages24h)} trong 24 giờ`)}${k('Cuộc trò chuyện',t.conversations)}${k('Ảnh',t.images)}${k('Video',t.videos)}${k('Lượt thích',t.likes)}${k('Báo cáo mở',t.openReports)}${k('Đang bật tìm gần',t.nearby)}${k('Đang hiển thị',t.visible)}${k('Bị khóa',t.suspended)}${k('Lượt chặn',t.blocks)}${k('Đã cài app',t.installed)}${k('Ảnh/video trong chat',t.chatMedia)}${k('Lượt thả thính 🔥',t.teases)}</div>
  <div class="grid">
   ${chartCard('c-signups','Đăng ký mới theo ngày','Hồ sơ được tạo, 30 ngày',stats.signups)}
   ${chartCard('c-active','Người dùng hoạt động theo ngày','Số tài khoản có hoạt động mỗi ngày',stats.active)}
@@ -178,7 +179,7 @@ function activityTable(rows,withUser=true){
 function reportList(list){return `<div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Lý do</th><th>Mô tả</th><th>Trạng thái</th></tr></thead><tbody>${list.map(r=>`<tr><td>${dt(r.created_at)}</td><td>${esc(r.reason)}</td><td class="wrap">${esc(r.note||'—')}</td><td>${r.resolved?'<span class="tag">Đã đóng</span>':'<span class="tag hot">Đang mở</span>'}</td></tr>`).join('')}</tbody></table></div>`;}
 async function thread(a,b,el,names={}){
  el.innerHTML=empty('Đang tải…');const list=await api('admin_messages',{a,b});
- list.forEach(m=>registerMedia(m.media));el.innerHTML=list.map(m=>`<div class="bubble ${m.sender_id===a?'':'right'}">${(m.media||[]).map(x=>x.src?`<button class="chat-thumb" data-view="${x.id}">${x.kind==='video'?`<video src="${safeURL(x.src)}" preload="metadata" muted playsinline></video>`:`<img src="${safeURL(x.src)}" alt="Ảnh trong tin nhắn" loading="lazy">`}</button>`:'<span class="faint">[Ảnh/video đã xóa]</span>').join('')}${esc(m.body)}<small>${esc(names[m.sender_id]||(m.sender_id===a?'A':'B'))} · ${dt(m.created_at)}</small></div>`).join('')||empty('Không có tin nhắn.');el.scrollTop=el.scrollHeight;
+ list.forEach(m=>registerMedia(m.media));el.innerHTML=list.map(m=>`<div class="bubble ${m.sender_id===a?'':'right'}">${m.kind==='tease'?'<span class="tag hot">🔥 Thả thính</span><br>':''}${(m.media||[]).map(x=>x.src?`<button class="chat-thumb" data-view="${x.id}">${x.kind==='video'?`<video src="${safeURL(x.src)}" preload="metadata" muted playsinline></video>`:`<img src="${safeURL(x.src)}" alt="Ảnh trong tin nhắn" loading="lazy">`}</button>`:'<span class="faint">[Ảnh/video đã xóa]</span>').join('')}${esc(m.body)}<small>${esc(names[m.sender_id]||(m.sender_id===a?'A':'B'))} · ${dt(m.created_at)}</small></div>`).join('')||empty('Không có tin nhắn.');el.scrollTop=el.scrollHeight;
 }
 
 /* ---------------- Chats ---------------- */
@@ -220,24 +221,44 @@ async function audit(){
  $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">MINH BẠCH</span><h1>Nhật ký quản trị</h1><p>Mọi lần xem hồ sơ, đọc tin nhắn và thay đổi của quản trị viên.</p></div></div>
  <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${list.map(a=>`<tr><td>${dt(a.created_at)}</td><td>${esc(AUDIT[a.action]||a.action)}</td><td>${a.target_id?`<button class="link" data-user="${a.target_id}">${esc(a.target_name||a.target_email||a.target_id)}</button>`:'—'}</td><td class="wrap faint">${esc(Object.entries(a.detail||{}).filter(([,v])=>v!==null&&v!==undefined).map(([k,v])=>`${k}: ${v}`).join(' · '))}</td></tr>`).join('')||`<tr><td colspan="4">${empty('Chưa có nhật ký.')}</td></tr>`}</tbody></table></div>`;
 }
+async function teasersView(){
+ const list=await api('admin_teasers');
+ $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">NỘI DUNG</span><h1>Câu thả thính 🔥</h1><p>Người dùng bấm 🔥 trên thẻ hồ sơ hoặc trong khung chat để gửi nhanh một câu dưới đây. Chỉ câu đang bật mới hiện cho người dùng; số thứ tự nhỏ hiện trước.</p></div></div>
+ <form class="card stack" id="t-new" style="margin-bottom:16px"><h2>Thêm câu mới</h2><label for="t-body">Nội dung (tối đa 200 ký tự, có thể dùng emoji)</label><textarea id="t-body" name="body" maxlength="200" rows="2" required placeholder="VD: Nhìn anh là thấy nóng hơn cả Sài Gòn trưa nắng 🔥"></textarea><div class="toolbar"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="active" checked> Bật ngay</label><button class="btn primary">Thêm câu</button></div></form>
+ <div class="table-wrap"><table><thead><tr><th style="width:70px">Thứ tự</th><th>Nội dung</th><th style="width:90px">Hiển thị</th><th style="width:170px"></th></tr></thead><tbody>${list.map(t=>`<tr><td><input type="number" value="${t.position}" data-t-pos="${t.id}" style="width:64px" aria-label="Thứ tự"></td><td class="wrap"><textarea data-t-body="${t.id}" maxlength="200" rows="2" style="width:100%" aria-label="Nội dung">${esc(t.body)}</textarea></td><td><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-t-active="${t.id}" ${t.active?'checked':''}> ${t.active?'Đang bật':'Tắt'}</label></td><td><button class="btn" data-t-save="${t.id}">Lưu</button> <button class="btn danger" data-t-del="${t.id}">Xóa</button></td></tr>`).join('')||`<tr><td colspan="4">${empty('Chưa có câu nào.')}</td></tr>`}</tbody></table></div>`;
+ $('#t-new').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{await api('admin_teaser_save',{body:f.body.value,active:f.active.checked});toast('Đã thêm câu thả thính.');teasersView();});};
+}
 async function settingsView(){
- let h=null;try{h=await hero();}catch{}
- $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">CÀI ĐẶT</span><h1>Ảnh trang chủ</h1><p>Cần cấu hình Backblaze B2 trên Worker trước khi tải ảnh.</p></div></div>
- <section class="card" style="max-width:640px"><img src="${safeURL(h?.src||'assets/long-1.jpg')}" alt="Ảnh hero hiện tại" id="hero-prev" style="border-radius:10px;margin-bottom:14px;max-height:280px;width:100%;object-fit:cover">
+ let h=null,ls={mode:'slide',interval:6,slides:[]};try{h=await hero();}catch{}try{ls=await api('admin_slides');}catch(e){toast(e.message);}
+ const src=id=>`${config.apiUrl}/hero/${encodeURIComponent(id)}`;
+ $('#view').innerHTML=`<div class="head"><div><span class="eyebrow">CÀI ĐẶT</span><h1>Hình ảnh trang web</h1><p>Ảnh được lưu trên Backblaze B2 và công khai cho khách chưa đăng nhập. Chỉ dùng ảnh bạn có quyền sử dụng.</p></div></div>
+ <section class="card" style="margin-bottom:18px"><div class="card-head"><div><h2>Trang đăng nhập (nửa bên phải)</h2><p class="sub">Hiện khi khách chưa đăng nhập hoặc vừa đăng xuất. Tối đa 12 ảnh. Ảnh dọc hoặc vuông, chủ thể ở giữa sẽ đẹp nhất.</p></div></div>
+  <form id="ls-form" class="toolbar" style="margin-bottom:14px"><label>Kiểu hiển thị <select name="mode"><option value="slide" ${ls.mode==='slide'?'selected':''}>Slide chuyển ảnh</option><option value="single" ${ls.mode==='single'?'selected':''}>Ảnh đơn (ảnh đầu tiên)</option></select></label><label>Mỗi ảnh (giây) <input name="interval" type="number" min="3" max="30" value="${ls.interval}" style="width:80px"></label><button class="btn primary">Lưu cài đặt</button></form>
+  <div class="slide-grid">${ls.slides.map((x,i)=>`<article class="slide-item"><img src="${safeURL(src(x.id))}" alt="Ảnh ${i+1}" loading="lazy"><div class="slide-meta"><label>Thứ tự <input type="number" value="${x.position}" data-s-pos="${x.id}" style="width:64px"></label><button class="btn" data-s-save="${x.id}">Lưu</button><button class="btn danger" data-del="${x.id}">Xóa</button></div>${i===0&&ls.mode==='single'?'<span class="tag hot slide-badge">Đang dùng</span>':''}</article>`).join('')}
+   <label class="slide-add"><input id="slide-files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><span>＋</span><b>Thêm ảnh</b><small id="slide-progress">${ls.slides.length}/12 ảnh</small></label></div>
+ </section>
+ <section class="card" style="max-width:640px"><h2>Ảnh hero trang Khám phá</h2><p class="sub">Ảnh lớn ở đầu trang Khám phá sau khi đăng nhập.</p><img src="${safeURL(h?.src||'assets/long-1.jpg')}" alt="Ảnh hero hiện tại" id="hero-prev" style="border-radius:10px;margin-bottom:14px;max-height:280px;width:100%;object-fit:cover">
  <form id="hero-form" class="stack"><label for="hero-img">Ảnh mới (JPG/PNG/WebP)</label><input id="hero-img" name="image" type="file" accept="image/jpeg,image/png,image/webp" required><label for="hero-alt">Mô tả ảnh</label><input id="hero-alt" name="alt" maxlength="160" value="${esc(h?.alt||'Sức hút từ cuộc sống đời thường')}"><button class="btn primary">Thay ảnh hero</button></form></section>`;
+ $('#ls-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{await api('admin_login_settings',{mode:f.mode.value,interval:Number(f.interval.value)});toast('Đã lưu cài đặt trang đăng nhập.');settingsView();});};
+ $('#slide-files').onchange=async e=>{const files=[...e.target.files];e.target.value='';if(!files.length)return;if(files.length+ls.slides.length>12){toast('Tối đa 12 ảnh.');return;}const pr=$('#slide-progress');let n=0;
+  for(const f of files){try{pr.textContent=`Đang nén ảnh ${n+1}/${files.length}…`;const p=await preparePhoto(f);await upload(p.blob,'slide',x=>{pr.textContent=`Đang tải ${n+1}/${files.length} · ${Math.round(x*100)}%`;});n++;}catch(err){toast(`${f.name}: ${err.message}`);}}
+  toast(`Đã thêm ${n} ảnh.`);settingsView();};
  $('#hero-img').onchange=e=>{const f=e.target.files?.[0];if(f)$('#hero-prev').src=URL.createObjectURL(f);};
  $('#hero-form').onsubmit=e=>{e.preventDefault();const f=e.target;busy(f,async()=>{const p=await preparePhoto(f.image.files[0]);const id=await upload(p.blob,'hero');await api('admin_hero',{id,alt:f.alt.value});toast('Đã thay ảnh hero.');});};
 }
 
 /* ---------------- Global clicks ---------------- */
 document.addEventListener('click',async e=>{
- const el=e.target.closest('[data-user],[data-close],[data-thread],[data-view],[data-del],[data-resolve],[data-resolve-suspend]');if(!el)return;
+ const el=e.target.closest('[data-user],[data-close],[data-thread],[data-view],[data-del],[data-resolve],[data-resolve-suspend],[data-t-save],[data-t-del],[data-s-save]');if(!el)return;
  try{
   if(el.dataset.close!==undefined){closeDrawer();return;}
+  if(el.dataset.sSave){const id=el.dataset.sSave;await api('admin_slide_order',{id,position:Number(document.querySelector(`[data-s-pos="${id}"]`).value)||0});toast('Đã lưu thứ tự.');settingsView();return;}
+  if(el.dataset.tSave){const id=el.dataset.tSave;el.disabled=true;try{await api('admin_teaser_save',{id,body:document.querySelector(`[data-t-body="${id}"]`).value,active:document.querySelector(`[data-t-active="${id}"]`).checked,position:Number(document.querySelector(`[data-t-pos="${id}"]`).value)||0});toast('Đã lưu.');teasersView();}finally{el.disabled=false;}return;}
+  if(el.dataset.tDel){if(!confirmInline(el,'Bấm lần nữa để xóa'))return;await api('admin_teaser_delete',{id:el.dataset.tDel});toast('Đã xóa.');teasersView();return;}
   if(el.dataset.user){await userDetail(el.dataset.user);return;}
   if(el.dataset.thread){const [a,b]=el.dataset.thread.split('|');el.parentElement.querySelectorAll('.convo').forEach(c=>c.classList.toggle('active',c===el));let names={};try{names=JSON.parse(el.dataset.names||'{}');}catch{}await thread(a,b,$('#drawer').open?$('#d-thread'):$('#c-thread'),names);return;}
   if(el.dataset.view){const m=mediaIndex.get(el.dataset.view)||findMedia(el.dataset.view);if(!m)return;$('#viewer-body').innerHTML=`<div class="viewer-inner"><div style="display:flex;justify-content:space-between;align-items:center"><b>${esc(m.owner_name||m.caption||'')}</b><button class="x" onclick="this.closest('dialog').close()" aria-label="Đóng">×</button></div>${m.kind==='video'?`<video src="${safeURL(m.src)}" controls autoplay playsinline></video>`:`<img src="${safeURL(m.src)}" alt="${esc(m.caption||'')}">`}${m.caption?`<p class="muted">${esc(m.caption)}</p>`:''}</div>`;$('#viewer').showModal();return;}
-  if(el.dataset.del){if(!confirmInline(el,'Bấm lần nữa để xóa'))return;await api('admin_delete_media',{id:el.dataset.del});toast('Đã xóa file.');el.closest('.tile')?.remove();return;}
+  if(el.dataset.del){if(!confirmInline(el,'Bấm lần nữa để xóa'))return;await api('admin_delete_media',{id:el.dataset.del});toast('Đã xóa file.');el.closest('.tile')?.remove();if(tab==='settings')settingsView();return;}
   if(el.dataset.resolve){await api('admin_resolve',{id:el.dataset.resolve,suspend:false});toast('Đã đóng báo cáo.');render();return;}
   if(el.dataset.resolveSuspend){if(!confirmInline(el,'Bấm lần nữa để khóa'))return;await api('admin_resolve',{id:el.dataset.resolveSuspend,suspend:true});toast('Đã đóng báo cáo và khóa tài khoản.');render();return;}
  }catch(err){toast(err.message);}

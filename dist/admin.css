@@ -102,3 +102,11 @@ dialog::backdrop{background:rgba(3,8,15,.7)}
 }
 
 .chat-thumb{display:block;padding:0;margin:0 0 6px;border-radius:8px;overflow:hidden;max-width:220px}.chat-thumb img,.chat-thumb video{display:block;width:100%;max-height:260px;object-fit:cover}
+
+.slide-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.slide-item{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.slide-item img{width:100%;aspect-ratio:3/4;object-fit:cover}
+.slide-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;font-size:11px}
+.slide-badge{position:absolute;top:8px;left:8px;background:#0b1421cc}
+.slide-add{display:grid;place-items:center;align-content:center;gap:4px;min-height:200px;border:1px dashed #4a5a70;border-radius:12px;cursor:pointer;color:var(--muted);text-align:center;padding:12px}
+.slide-add span{font-size:30px;color:var(--orange)}.slide-add:hover{border-color:var(--orange)}

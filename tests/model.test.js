@@ -18,5 +18,5 @@ test('public interface contains no fictional membership claims or sample state',
   assert.doesNotMatch(text,/hồ sơ minh họa|nhân vật hư cấu|bản trải nghiệm|thử nghiệm|chichdao\.preview|defaultState/i);
  }
  const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
- assert.match(html,/id="onboarding-track"/);assert.match(html,/id="login-step"/);assert.match(html,/id="profile-reminder"/);
+ assert.match(html,/id="auth-screen"/);assert.match(html,/id="auth-slides"/);assert.match(html,/id="profile-banner"/);assert.match(html,/id="chat-dock"/);
 });

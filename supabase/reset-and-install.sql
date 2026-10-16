@@ -1,11 +1,10 @@
 -- CHI.CH DAO. — cài lại toàn bộ schema app (XÓA dữ liệu app, giữ tài khoản đăng nhập).
--- Chỉ dùng khi chưa có dữ liệu thật. Chạy 1 lần trong Supabase SQL Editor.
+-- Chỉ dùng khi chưa có dữ liệu thật. Muốn giữ dữ liệu: dùng các file upgrade-*.sql.
 begin;
--- Reset CHI.CH DAO. app objects (keeps auth.users). Safe only while app tables are empty.
 drop function if exists public.cd_api(uuid,text,jsonb);
-drop table if exists public.cd_reports, public.cd_messages, public.cd_blocks, public.cd_likes, public.cd_settings, public.cd_media, public.cd_profiles cascade;
+drop table if exists public.cd_teasers, public.cd_reports, public.cd_messages, public.cd_blocks, public.cd_likes, public.cd_settings, public.cd_media, public.cd_profiles cascade;
 drop schema if exists chich_private cascade;
--- CHI.CH DAO. v0.4. Run once on a dedicated Supabase project.
+-- CHI.CH DAO. v0.7. Run once on a dedicated Supabase project.
 -- Browser roles intentionally have NO table/RPC access. The Worker validates
 -- Supabase access tokens with /auth/v1/user, then calls this service-only API.
 create schema if not exists chich_private;
@@ -62,7 +61,7 @@ create table public.cd_media (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null references public.cd_profiles(id) on delete cascade,
  kind text not null check(kind in ('image','video')),
- purpose text not null default 'profile' check(purpose in ('profile','hero','chat')),
+ purpose text not null default 'profile' check(purpose in ('profile','hero','chat','slide')),
  mime text not null check(mime in ('image/jpeg','image/png','image/webp','video/mp4','video/webm')),
  bytes integer not null check(bytes>0 and bytes<=20971520),
  object_key text not null unique,
@@ -75,7 +74,10 @@ create index cd_media_owner on public.cd_media(user_id,purpose,status);
 create table public.cd_settings (
  id boolean primary key default true check(id),
  hero_media_id uuid references public.cd_media(id) on delete set null,
- hero_alt text not null default 'Sức hút từ những điều đời thường' check(length(hero_alt)<=160)
+ hero_alt text not null default 'Sức hút từ những điều đời thường' check(length(hero_alt)<=160),
+ -- Signed-out page: admin images on the right side, as a single image or a slideshow.
+ login_mode text not null default 'slide' check(login_mode in ('single','slide')),
+ login_interval integer not null default 6 check(login_interval between 3 and 30)
 );
 insert into public.cd_settings(id) values(true);
 create table public.cd_likes (
@@ -95,8 +97,24 @@ create table public.cd_messages (
  recipient_id uuid not null references public.cd_profiles(id) on delete cascade,
  body text not null default '' check(length(body)<=1000),
  media_id uuid unique references public.cd_media(id) on delete set null,
+ kind text not null default 'text' check(kind in ('text','tease')),
  created_at timestamptz not null default now(), check(sender_id<>recipient_id)
 );
+-- Flirty one-tap lines ("thả thính") written by the admin; users pick one and send it as a 🔥 message.
+create table public.cd_teasers (
+ id uuid primary key default gen_random_uuid(),
+ body text not null check(length(trim(body)) between 1 and 200),
+ active boolean not null default true,
+ position integer not null default 0,
+ created_at timestamptz not null default now()
+);
+insert into public.cd_teasers(body,position) values
+ ('Ảnh của anh làm em quên luôn mình định nói gì 🔥',1),
+ ('Nhìn anh là thấy nóng hơn cả Sài Gòn trưa nắng 🔥',2),
+ ('Tập ở đâu mà body chuẩn vậy anh? Chỉ em với 😏',3),
+ ('Cuối tuần này anh rảnh đi cà phê không?',4),
+ ('Cho em xin một nụ cười để làm quen nha 😉',5),
+ ('Anh có tin vào tiếng sét ái tình không, hay để em lướt qua lần nữa?',6);
 create index cd_message_pair on public.cd_messages(sender_id,recipient_id,created_at desc);
 create index cd_message_recipient on public.cd_messages(recipient_id,created_at desc);
 create table public.cd_reports (
@@ -129,14 +147,15 @@ alter table public.cd_likes enable row level security;
 alter table public.cd_blocks enable row level security;
 alter table public.cd_messages enable row level security;
 alter table public.cd_reports enable row level security;
+alter table public.cd_teasers enable row level security;
 alter table chich_private.accounts enable row level security;
 alter table chich_private.locations enable row level security;
 alter table chich_private.rate_limits enable row level security;
 alter table chich_private.settings enable row level security;
 alter table chich_private.activity enable row level security;
 alter table chich_private.admin_audit enable row level security;
-revoke all on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports from public,anon,authenticated;
-grant select,insert,update,delete on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports to service_role;
+revoke all on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports,public.cd_teasers from public,anon,authenticated;
+grant select,insert,update,delete on public.cd_profiles,public.cd_media,public.cd_settings,public.cd_likes,public.cd_blocks,public.cd_messages,public.cd_reports,public.cd_teasers to service_role;
 grant select,insert,update,delete on all tables in schema chich_private to service_role;
 
 create function chich_private.is_blocked(a uuid,b uuid) returns boolean
@@ -220,7 +239,8 @@ begin
  if current_user<>'service_role' then raise exception 'Forbidden'; end if;
  -- Auth-independent public hero; returns only the selected, ready hero.
  if p_action='hero' then
-  return (select jsonb_build_object('mediaId',s.hero_media_id,'alt',s.hero_alt) from public.cd_settings s where id);
+  return (select jsonb_build_object('mediaId',s.hero_media_id,'alt',s.hero_alt,'loginMode',s.login_mode,'loginInterval',s.login_interval,
+   'slides',coalesce((select jsonb_agg(md.id order by md.position,md.created_at) from public.cd_media md where md.purpose='slide' and md.status='ready'),'[]'::jsonb)) from public.cd_settings s where id);
  end if;
  if p_action='cleanup_list' then
   return coalesce((select jsonb_agg(to_jsonb(x)) from (select id,object_key from public.cd_media md where (status in ('pending','uploading') and created_at<now()-interval '1 hour') or status='deleting' or (purpose='chat' and status='ready' and created_at<now()-interval '24 hours' and not exists(select 1 from public.cd_messages mm where mm.media_id=md.id)) limit 100) x),'[]');
@@ -238,7 +258,9 @@ begin
  end if;
  -- Public hero media reads are restricted to the current hero ID.
  if p_action='hero_file' then
-  select mm.* into m from public.cd_media mm join public.cd_settings s on s.hero_media_id=mm.id where mm.id=(p_data->>'id')::uuid and mm.status='ready' and mm.purpose='hero';
+  -- Public images only: the selected homepage hero, or a sign-in page slide.
+  select mm.* into m from public.cd_media mm where mm.id=(p_data->>'id')::uuid and mm.status='ready'
+   and (mm.purpose='slide' or (mm.purpose='hero' and mm.id=(select hero_media_id from public.cd_settings where id)));
   if m.id is null then raise exception 'Không tìm thấy ảnh.'; end if;
   return to_jsonb(m);
  end if;
@@ -257,7 +279,7 @@ begin
  if p_action in ('session','logout','app_installed','profile_save','visibility','location','location_off','like','block','unblock','report','send','finish_media','delete_media','accept_adult') then
   if p_action in ('session','logout','app_installed') then perform chich_private.throttle(p_actor,'session',30,60); end if;
   insert into chich_private.activity(user_id,event,target_id,country,region,city,device)
-  values(p_actor,case when p_action='session' then left(coalesce(nullif(p_data->>'event',''),'session'),40) when p_action='like' and not coalesce((p_data->>'liked')::boolean,false) then 'unlike' else p_action end,
+  values(p_actor,case when p_action='session' then left(coalesce(nullif(p_data->>'event',''),'session'),40) when p_action='like' and not coalesce((p_data->>'liked')::boolean,false) then 'unlike' when p_action='send' and coalesce(p_data->>'teaserId','')<>'' then 'tease' else p_action end,
    case when p_action in ('like','block','unblock','report','send') and coalesce(p_data->>'id','') ~* '^[0-9a-f-]{36}$' then (p_data->>'id')::uuid end,
    left(coalesce(p_data->'_geo'->>'country',''),8),left(coalesce(p_data->'_geo'->>'region',''),80),left(coalesce(p_data->'_geo'->>'city',''),80),left(coalesce(p_data->'_geo'->>'device',''),120));
   if p_action='logout' then return '{}'; end if;
@@ -300,7 +322,7 @@ begin
    cross join lateral (select 6371.0*2*asin(sqrt(least(1.0,power(sin(radians((l.lat-loc.lat)::double precision)/2),2)+cos(radians(loc.lat::double precision))*cos(radians(l.lat::double precision))*power(sin(radians((l.lon-loc.lon)::double precision)/2),2)))) as km) d
    where q.id<>p_actor and chich_private.can_view(p_actor,q.id)
    and (radius=0 or (l.user_id is not null and abs(l.lat-loc.lat)<=radius/110.0+0.02 and d.km<=radius))
-   and (coalesce(p_data->>'city','all')='all' or q.city=p_data->>'city')
+   and (coalesce(p_data->>'city','all') in ('all','') or chich_private.search_key(q.city) like '%'||chich_private.search_key(left(p_data->>'city',80))||'%')
    and (coalesce(p_data->>'occupation','all')='all' or q.occupation=p_data->>'occupation')
    and (coalesce(p_data->>'bodyType','all')='all' or q.body_type=p_data->>'bodyType')
    and (coalesce(p_data->>'lifestyle','all')='all' or q.lifestyle=p_data->>'lifestyle')
@@ -321,20 +343,20 @@ begin
    if not chich_private.complete(p) then raise exception 'Hãy hoàn thiện hồ sơ trước khi gửi ảnh/video.'; end if;
   else perform chich_private.throttle(p_actor,'upload',30,3600); end if;
   perform pg_advisory_xact_lock(hashtextextended(p_actor::text,0));
-  if v_purpose='hero' and not admin then raise exception 'Forbidden'; end if;
-  if v_purpose='hero' and k<>'image' then raise exception 'Hero phải là ảnh.'; end if;
-  if k is null or k not in ('image','video') or v_purpose not in ('profile','hero','chat') or coalesce(p_data->>'bytes','') !~ '^\d{1,9}$' then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
+  if v_purpose in ('hero','slide') and not admin then raise exception 'Forbidden'; end if;
+  if v_purpose in ('hero','slide') and k<>'image' then raise exception 'Ảnh trang chủ/đăng nhập phải là ảnh.'; end if;
+  if k is null or k not in ('image','video') or v_purpose not in ('profile','hero','chat','slide') or coalesce(p_data->>'bytes','') !~ '^\d{1,9}$' then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
   if (p_data->>'bytes')::int<1 or (k='image' and ((p_data->>'bytes')::int>8388608 or coalesce(p_data->>'mime','') not in ('image/jpeg','image/png','image/webp'))) or (k='video' and ((p_data->>'bytes')::int>20971520 or coalesce(p_data->>'mime','') not in ('video/mp4','video/webm'))) then raise exception 'Định dạng hoặc dung lượng không hợp lệ.'; end if;
   if v_purpose='chat' then
    n=0; -- chat attachments: no album cap; limited by size + upload_chat throttle; unsent files are purged after 24h
   else
    select count(*) into n from public.cd_media where user_id=p_actor and kind=k and cd_media.purpose=v_purpose and status<>'deleting';
-   if n>=(case when v_purpose='hero' then 3 when k='image' then 10 else 2 end) then raise exception 'Đã đạt giới hạn ảnh hoặc video.'; end if;
+   if n>=(case when v_purpose='hero' then 3 when v_purpose='slide' then 12 when k='image' then 10 else 2 end) then raise exception 'Đã đạt giới hạn ảnh hoặc video.'; end if;
   end if;
   v_media=gen_random_uuid();
   insert into public.cd_media(id,user_id,kind,purpose,mime,bytes,object_key,position) values(v_media,p_actor,k,v_purpose,p_data->>'mime',(p_data->>'bytes')::int,
    -- B2 layout: site/hero/<id>.<ext> | users/<uid>/images|videos/<id>.<ext> | users/<uid>/chat/<id>.<ext>
-   case when v_purpose='hero' then 'site/hero/' when v_purpose='chat' then 'users/'||p_actor::text||'/chat/' else 'users/'||p_actor::text||case when k='image' then '/images/' else '/videos/' end end||v_media::text||'.'||case p_data->>'mime' when 'image/jpeg' then 'jpg' when 'image/png' then 'png' when 'image/webp' then 'webp' when 'video/mp4' then 'mp4' else 'webm' end,n) returning * into m;
+   case when v_purpose='hero' then 'site/hero/' when v_purpose='slide' then 'site/login/' when v_purpose='chat' then 'users/'||p_actor::text||'/chat/' else 'users/'||p_actor::text||case when k='image' then '/images/' else '/videos/' end end||v_media::text||'.'||case p_data->>'mime' when 'image/jpeg' then 'jpg' when 'image/png' then 'png' when 'image/webp' then 'webp' when 'video/mp4' then 'mp4' else 'webm' end,n) returning * into m;
   return to_jsonb(m);
  elsif p_action='claim_media' then
   update public.cd_media set status='uploading' where id=(p_data->>'id')::uuid and user_id=p_actor and status='pending' and created_at>now()-interval '15 minutes' returning * into m;
@@ -362,7 +384,7 @@ begin
  elsif p_action='media_file' then
   select * into m from public.cd_media where id=(p_data->>'id')::uuid and status='ready';
   if m.id is null or (not admin and (
-     m.purpose='hero'
+     m.purpose not in ('profile','chat')
      or (m.purpose='profile' and not chich_private.can_view(p_actor,m.user_id))
      -- chat attachment: only the sender, or the recipient of the message carrying it (and not blocked)
      or (m.purpose='chat' and m.user_id<>p_actor and not exists(select 1 from public.cd_messages mm where mm.media_id=m.id and mm.recipient_id=p_actor and not chich_private.is_blocked(p_actor,mm.sender_id)))
@@ -391,7 +413,8 @@ begin
      'openReports',(select count(*) from public.cd_reports where not resolved),
      'nearby',(select count(*) from chich_private.locations where updated_at>now()-interval '24 hours'),
      'installed',(select count(*) from chich_private.accounts where app_installed_at is not null),
-     'chatMedia',(select count(*) from public.cd_media where purpose='chat' and status='ready')),
+     'chatMedia',(select count(*) from public.cd_media where purpose='chat' and status='ready'),
+     'teases',(select count(*) from public.cd_messages where kind='tease')),
     'signups',chich_private.daily('signup'),
     'active',chich_private.daily('active'),
     'messagesDaily',chich_private.daily('message'),
@@ -439,21 +462,21 @@ begin
    target=nullif(p_data->>'userId','')::uuid;
    return coalesce((select jsonb_agg(to_jsonb(x) order by x.last_at desc) from (
     select c.a,c.b,c.n,c.last_at,c.preview,pa.name a_name,pb.name b_name,chich_private.auth_email(c.a) a_email,chich_private.auth_email(c.b) b_email from (
-     select least(sender_id,recipient_id) a,greatest(sender_id,recipient_id) b,count(*) n,max(created_at) last_at,left((array_agg(case when cm.body='' and cm.media_id is not null then '[Ảnh/video]' else cm.body end order by cm.created_at desc))[1],140) preview
+     select least(sender_id,recipient_id) a,greatest(sender_id,recipient_id) b,count(*) n,max(created_at) last_at,left((array_agg(case when cm.kind='tease' then '🔥 '||cm.body when cm.body='' and cm.media_id is not null then '[Ảnh/video]' else cm.body end order by cm.created_at desc))[1],140) preview
      from public.cd_messages cm where target is null or target in (cm.sender_id,cm.recipient_id) group by 1,2) c
     join public.cd_profiles pa on pa.id=c.a join public.cd_profiles pb on pb.id=c.b
     order by c.last_at desc limit 50 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]');
   elsif p_action='admin_messages' then
    target=(p_data->>'a')::uuid;v_media=(p_data->>'b')::uuid;
    insert into chich_private.admin_audit(admin_id,action,target_id,detail) values(p_actor,'view_chat',target,jsonb_build_object('with',v_media));
-   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
+   return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.kind,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
     from public.cd_messages mm left join public.cd_media md on md.id=mm.media_id and md.status='ready'
     where (mm.sender_id=target and mm.recipient_id=v_media) or (mm.sender_id=v_media and mm.recipient_id=target) order by mm.created_at desc limit 1000) x),'[]');
   elsif p_action='admin_media' then
    return jsonb_build_object('media',coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from (
     select md.id,md.user_id,md.kind,md.mime,md.bytes,md.caption,md.status,md.purpose,md.created_at,q.name owner_name,chich_private.auth_email(md.user_id) owner_email
     from public.cd_media md join public.cd_profiles q on q.id=md.user_id
-    where md.status='ready' and md.purpose<>'hero' and (coalesce(p_data->>'kind','all')='all' or md.kind=p_data->>'kind') and (coalesce(p_data->>'purpose','all')='all' or md.purpose=p_data->>'purpose')
+    where md.status='ready' and md.purpose in ('profile','chat') and (coalesce(p_data->>'kind','all')='all' or md.kind=p_data->>'kind') and (coalesce(p_data->>'purpose','all')='all' or md.purpose=p_data->>'purpose')
     order by md.created_at desc limit 60 offset least(5000,greatest(0,coalesce((p_data->>'offset')::int,0)))) x),'[]'));
   elsif p_action='admin_activity' then
    target=nullif(p_data->>'userId','')::uuid;
@@ -489,6 +512,32 @@ begin
   update public.cd_settings set hero_media_id=m.id,hero_alt=left(coalesce(nullif(trim(p_data->>'alt'),''),'Sức hút từ những điều đời thường'),160) where id;
   update public.cd_media set status='deleting' where purpose='hero' and id<>m.id;
   return '{}';
+  elsif p_action='admin_slides' then
+   return (select jsonb_build_object('mode',s.login_mode,'interval',s.login_interval,
+    'slides',coalesce((select jsonb_agg(jsonb_build_object('id',md.id,'position',md.position,'bytes',md.bytes,'createdAt',md.created_at) order by md.position,md.created_at) from public.cd_media md where md.purpose='slide' and md.status='ready'),'[]'::jsonb)) from public.cd_settings s where id);
+  elsif p_action='admin_slide_order' then
+   update public.cd_media set position=coalesce((p_data->>'position')::int,position) where id=(p_data->>'id')::uuid and purpose='slide';
+   return '{}';
+  elsif p_action='admin_login_settings' then
+   update public.cd_settings set login_mode=coalesce(nullif(p_data->>'mode',''),login_mode),login_interval=least(30,greatest(3,coalesce((p_data->>'interval')::int,login_interval))) where id;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'login_settings',jsonb_build_object('mode',p_data->>'mode','interval',p_data->>'interval'));
+   return '{}';
+  elsif p_action='admin_teasers' then
+   return coalesce((select jsonb_agg(to_jsonb(t) order by t.position,t.created_at) from public.cd_teasers t),'[]');
+  elsif p_action='admin_teaser_save' then
+   if coalesce(length(trim(p_data->>'body')),0) not between 1 and 200 then raise exception 'Câu thả thính cần 1–200 ký tự.'; end if;
+   if coalesce(p_data->>'id','')='' then
+    insert into public.cd_teasers(body,active,position) values(trim(p_data->>'body'),coalesce((p_data->>'active')::boolean,true),coalesce((p_data->>'position')::int,(select coalesce(max(position),0)+1 from public.cd_teasers))) returning id into v_media;
+   else
+    update public.cd_teasers set body=trim(p_data->>'body'),active=coalesce((p_data->>'active')::boolean,active),position=coalesce((p_data->>'position')::int,position) where id=(p_data->>'id')::uuid returning id into v_media;
+    if v_media is null then raise exception 'Không tìm thấy câu thả thính.'; end if;
+   end if;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'teaser_save',jsonb_build_object('teaser',v_media));
+   return jsonb_build_object('id',v_media);
+  elsif p_action='admin_teaser_delete' then
+   delete from public.cd_teasers where id=(p_data->>'id')::uuid;
+   insert into chich_private.admin_audit(admin_id,action,detail) values(p_actor,'teaser_delete',jsonb_build_object('teaser',p_data->>'id'));
+   return '{}';
   elsif p_action='admin_reports' then
    return coalesce((select jsonb_agg(to_jsonb(a) order by a.created_at) from (select r.*,rp.name reporter_name,tp.name target_name,chich_private.auth_email(r.reporter_id) reporter_email,chich_private.auth_email(r.target_id) target_email from public.cd_reports r join public.cd_profiles rp on rp.id=r.reporter_id join public.cd_profiles tp on tp.id=r.target_id where not r.resolved order by r.created_at limit 100) a),'[]');
   elsif p_action='admin_resolve' then
@@ -513,11 +562,19 @@ begin
    insert into public.cd_reports(reporter_id,target_id,reason,note) values(p_actor,target,trim(p_data->>'reason'),left(coalesce(p_data->>'note',''),500));
   else
    if not chich_private.complete(p) then raise exception 'Hãy hoàn thiện hồ sơ trước khi gửi lời chào.';end if;
+   if coalesce(p_data->>'teaserId','')<>'' then
+    select body into k from public.cd_teasers where id=(p_data->>'teaserId')::uuid and active;
+    if k is null then raise exception 'Câu thả thính không còn khả dụng.';end if;
+    insert into public.cd_messages(sender_id,recipient_id,body,kind) values(p_actor,target,k,'tease');
+    return '{}';
+   end if;
    v_media=nullif(p_data->>'mediaId','')::uuid;
    if v_media is not null and not exists(select 1 from public.cd_media where id=v_media and user_id=p_actor and purpose='chat' and status='ready') then raise exception 'Ảnh/video đính kèm không hợp lệ hoặc chưa tải xong.';end if;
    if coalesce(length(trim(p_data->>'text')),0)>1000 or (v_media is null and coalesce(length(trim(p_data->>'text')),0)=0) then raise exception 'Tin nhắn cần từ 1 đến 1000 ký tự.';end if;
    insert into public.cd_messages(sender_id,recipient_id,body,media_id) values(p_actor,target,coalesce(trim(p_data->>'text'),''),v_media);
   end if; return '{}';
+ elsif p_action='teasers' then
+  return coalesce((select jsonb_agg(jsonb_build_object('id',t.id,'body',t.body) order by t.position,t.created_at) from public.cd_teasers t where t.active),'[]');
  elsif p_action='liked' then
   return coalesce((select jsonb_agg(chich_private.profile_json(q)) from public.cd_profiles q join public.cd_likes l on l.target_id=q.id where l.user_id=p_actor and chich_private.can_view(p_actor,q.id)),'[]');
  elsif p_action='blocked' then
@@ -527,7 +584,7 @@ begin
  elsif p_action='messages' then
   target=(p_data->>'id')::uuid;
   if not chich_private.can_view(p_actor,target) then raise exception 'Cuộc trò chuyện không khả dụng.';end if;
-  return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
+  return coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at) from (select mm.id,mm.sender_id,mm.recipient_id,mm.body,mm.kind,mm.created_at,case when md.id is null then '[]'::jsonb else jsonb_build_array(jsonb_build_object('id',md.id,'kind',md.kind,'mime',md.mime,'bytes',md.bytes)) end as media
     from public.cd_messages mm left join public.cd_media md on md.id=mm.media_id and md.status='ready'
     where (mm.sender_id=p_actor and mm.recipient_id=target) or (mm.sender_id=target and mm.recipient_id=p_actor) order by mm.created_at desc limit 100) x),'[]');
  end if;

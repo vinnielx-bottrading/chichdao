@@ -2,10 +2,11 @@ import { AwsClient } from 'aws4fetch';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL=/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
-const userActions=['me','session','logout','app_installed','accept_adult','profile_save','visibility','location','location_off','discover','profile','edit_media','like','block','unblock','report','send','liked','blocked','contacts','messages'];
-const adminActions=['admin_stats','admin_users','admin_user','admin_conversations','admin_messages','admin_media','admin_activity','admin_suspend','admin_audit','admin_hero','admin_reports','admin_resolve'];
-// admin_delete_media is handled specially (storage delete); admin_audit_add is Worker-only and never client-callable.
-const actions=new Set([...userActions,...adminActions]);
+// Client-callable actions are decided by the database (it rejects unknown ones and checks every permission).
+// The Worker only blocks actions that must never come from a browser: media/upload lifecycle, cleanup jobs,
+// public hero reads and audit writes. New features in the DB therefore need no Worker redeploy.
+const WORKER_ONLY=new Set(['hero','hero_file','cleanup_list','cleanup_expired','cleanup_done','reserve_media','claim_media','finish_media','delete_media','media_file','admin_audit_add']);
+export function clientAction(a){return typeof a==='string'&&/^[a-z_]{2,40}$/.test(a)&&!WORKER_ONLY.has(a);}
 const enc=new TextEncoder();
 class HttpError extends Error { constructor(status,message){super(message);this.status=status;} }
 export function allowedOrigin(origin,env){return (env.ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).includes(origin);}
@@ -145,7 +146,7 @@ async function handle(req,env){
  const user=await actor(req,env);
  if(req.method==='POST'&&path==='/api'){
   const {action,data={}}=await jsonBody(req);
-  if(action!=='admin_delete_media'&&!actions.has(action))throw new HttpError(400,'Thao tác không hợp lệ.');
+  if(!clientAction(action))throw new HttpError(400,'Thao tác không hợp lệ.');
   const payload={...(data&&typeof data==='object'&&!Array.isArray(data)?data:{})};delete payload._geo;payload._geo=geo(req);
   if(action==='admin_delete_media'){const m=await rpc(env,user.id,'admin_delete_media',payload);await deleteObject(env,m).catch(()=>{});return json({deleted:true});}
   const result=await rpc(env,user.id,action,payload);return json(await hydrate(result,user.id,url.origin,env));

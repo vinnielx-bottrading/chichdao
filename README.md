@@ -1,4 +1,4 @@
-# CHI.CH DAO. — v0.5
+# CHI.CH DAO. — v0.7
 
 Ứng dụng hẹn hò nam–nam 18+, cài được như app (PWA). Frontend trên **Vercel**; API là **Cloudflare Worker**; **Supabase** làm database (và đăng nhập Google/email); **Backblaze B2** (bucket private) lưu ảnh/video. Hướng dẫn triển khai: `cloudflare/HUONG-DAN.md`.
 
@@ -71,7 +71,18 @@ python -m http.server 8080 --directory dist
 
 Thêm `http://localhost:8080` vào CORS Worker và redirect allowlist Supabase cho môi trường phát triển. Không dùng wildcard redirect trong production.
 
+## Nâng cấp database
+
+- Cài mới (chưa có dữ liệu): `supabase/schema.sql`.
+- Đang chạy bản cũ, muốn giữ dữ liệu: chạy lần lượt `supabase/upgrade-v0.6.sql` rồi `supabase/upgrade-v0.7.sql` (chạy lại nhiều lần cũng an toàn).
+- Cài lại từ đầu (xóa dữ liệu app, giữ tài khoản đăng nhập): `supabase/reset-and-install.sql`.
+
 ## Quy tắc sản phẩm
+
+- Khách chưa đăng nhập hoặc vừa đăng xuất thấy trang đăng nhập 2 nửa: trái là form (bắt buộc tick xác nhận 18+), phải là ảnh admin chọn trong Admin → Cài đặt (slide chuyển ảnh mờ dần hoặc ảnh đơn, tối đa 12 ảnh, lưu tại `site/login/` trên B2).
+
+- Thẻ hồ sơ: bấm ảnh để xem chi tiết; 🔥 mở khung chat nổi với các câu thả thính do admin soạn (tab Thả thính 🔥 trong admin); 💬 mở khung chat nổi. Tin thả thính lưu với `kind='tease'` và chỉ gửi được câu admin đang bật.
+- Khu vực: nhập tự do, có gợi ý 34 tỉnh/thành Việt Nam và các thành phố lớn trên thế giới; bộ lọc so khớp không dấu.
 
 - Hồ sơ hoàn thiện: tên 2–40 ký tự, tuổi tự khai 18–80, khu vực, mong muốn kết nối, giới thiệu 20–400 ký tự, xác nhận 18+, ít nhất 1 ảnh đã tải xong.
 - Nghề nghiệp, vóc dáng, lối sống, cách vận động là tùy chọn. Có nông dân/làm vườn và công nhân/thợ kỹ thuật.

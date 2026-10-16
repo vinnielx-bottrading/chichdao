@@ -282,9 +282,10 @@ function guessServiceRegion(url, headers) {
 // worker/index.js
 var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 var EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
-var userActions = ["me", "session", "logout", "app_installed", "accept_adult", "profile_save", "visibility", "location", "location_off", "discover", "profile", "edit_media", "like", "block", "unblock", "report", "send", "liked", "blocked", "contacts", "messages"];
-var adminActions = ["admin_stats", "admin_users", "admin_user", "admin_conversations", "admin_messages", "admin_media", "admin_activity", "admin_suspend", "admin_audit", "admin_hero", "admin_reports", "admin_resolve"];
-var actions = /* @__PURE__ */ new Set([...userActions, ...adminActions]);
+var WORKER_ONLY = /* @__PURE__ */ new Set(["hero", "hero_file", "cleanup_list", "cleanup_expired", "cleanup_done", "reserve_media", "claim_media", "finish_media", "delete_media", "media_file", "admin_audit_add"]);
+function clientAction(a) {
+  return typeof a === "string" && /^[a-z_]{2,40}$/.test(a) && !WORKER_ONLY.has(a);
+}
 var enc = new TextEncoder();
 var HttpError = class extends Error {
   constructor(status, message) {
@@ -498,7 +499,7 @@ async function handle(req, env) {
   const user = await actor(req, env);
   if (req.method === "POST" && path === "/api") {
     const { action, data = {} } = await jsonBody(req);
-    if (action !== "admin_delete_media" && !actions.has(action)) throw new HttpError(400, "Thao t\xE1c kh\xF4ng h\u1EE3p l\u1EC7.");
+    if (!clientAction(action)) throw new HttpError(400, "Thao t\xE1c kh\xF4ng h\u1EE3p l\u1EC7.");
     const payload = { ...data && typeof data === "object" && !Array.isArray(data) ? data : {} };
     delete payload._geo;
     payload._geo = geo(req);
@@ -588,6 +589,7 @@ export {
   b2Endpoint,
   b2Region,
   boundedBody,
+  clientAction,
   index_default as default,
   deviceLabel,
   hydrate,
