@@ -298,3 +298,12 @@ html[data-gc="5"] .card-title h3,html[data-gc="6"] .card-title h3{font-size:18px
 .update-bar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:95;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 18px;border-radius:14px;background:color-mix(in srgb,var(--text) 8%,var(--bg));border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);box-shadow:0 12px 30px #0007;font-size:13px;max-width:calc(100vw - 32px)}
 .update-bar .button.small{padding:8px 14px;min-height:0;font-size:12px}
 @media(max-width:640px){.update-bar{bottom:calc(84px + env(safe-area-inset-bottom))}}
+/* Language flags */
+.auth-langs{margin-bottom:18px}
+.lang-flags{display:flex;flex-wrap:wrap;gap:8px}
+.lang-flag{width:40px;height:30px;padding:3px;border-radius:8px;background:transparent;border:1.5px solid transparent;display:grid;place-items:center;cursor:pointer;opacity:.72;transition:opacity .15s,border-color .15s,transform .15s}
+.lang-flag svg{width:30px;height:20px;border-radius:3px;box-shadow:0 0 0 1px #0003;display:block}
+.lang-flag:hover{opacity:1;transform:translateY(-1px)}
+.lang-flag.on{opacity:1;border-color:var(--accent)}
+.lang-flag:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lang-wide{margin-top:14px}.lang-wide .lang-flag{width:48px;height:36px}.lang-wide .lang-flag svg{width:36px;height:24px}

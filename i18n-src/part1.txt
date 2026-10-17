@@ -1,0 +1,115 @@
+# vi ¦ en ¦ fr ¦ es ¦ zh ¦ ja ¦ ko   ({} = giá trị chèn vào, giữ nguyên thứ tự; {0} {1} để đổi thứ tự)
+(ô vuông có mũi tên hướng lên) ở thanh dưới cùng. ¦ (the square with an up arrow) in the bottom bar. ¦ (le carré avec une flèche vers le haut) dans la barre du bas. ¦ (el cuadrado con una flecha hacia arriba) en la barra inferior. ¦ （底部栏中带向上箭头的方框）。 ¦ （下のバーにある上向き矢印の四角）。 ¦ (아래쪽 막대의 위쪽 화살표가 있는 네모)를 누르세요.
+, bấm nút ¦ , tap ¦ , appuyez sur ¦ , toca ¦ ，点击 ¦ 、次をタップ ¦ , 다음을 누르세요
+. Biểu tượng CHI.CH DAO. sẽ xuất hiện trên màn hình chính. ¦ . The CHI.CH DAO. icon will appear on your home screen. ¦ . L’icône CHI.CH DAO. apparaîtra sur votre écran d’accueil. ¦ . El icono de CHI.CH DAO. aparecerá en tu pantalla de inicio. ¦ 。CHI.CH DAO. 图标将出现在主屏幕上。 ¦ 。ホーム画面に CHI.CH DAO. のアイコンが表示されます。 ¦ . 홈 화면에 CHI.CH DAO. 아이콘이 나타나요.
+. Cùng gu hình thể, hợp gu hẹn hò. ¦ . Same type, same vibe for dating. ¦ . Même style, même envie de rencontres. ¦ . Mismo tipo, misma onda para salir. ¦ 。身材同好，约会合拍。 ¦ 。体型の好みも、デートの相性も。 ¦ . 같은 취향, 잘 맞는 데이트.
+/ Cùng gu, cùng tần số. ¦ / Same type, same wavelength. ¦ / Même style, même longueur d’onde. ¦ / Mismo tipo, misma sintonía. ¦ / 同好同频。 ¦ / 同じ好み、同じ周波数。 ¦ / 같은 취향, 같은 주파수.
+{}/10 ảnh · {}/2 video ¦ {}/10 photos · {}/2 videos ¦ {}/10 photos · {}/2 vidéos ¦ {}/10 fotos · {}/2 vídeos ¦ {}/10 张照片 · {}/2 个视频 ¦ 写真 {}/10 · 動画 {}/2 ¦ 사진 {}/10 · 동영상 {}/2
+1 giờ ¦ 1 hour ¦ 1 heure ¦ 1 hora ¦ 1 小时 ¦ 1時間 ¦ 1시간
+1 phút ¦ 1 minute ¦ 1 minute ¦ 1 minuto ¦ 1 分钟 ¦ 1分 ¦ 1분
+5 phút ¦ 5 minutes ¦ 5 minutes ¦ 5 minutos ¦ 5 分钟 ¦ 5分 ¦ 5분
+10 phút ¦ 10 minutes ¦ 10 minutes ¦ 10 minutos ¦ 10 分钟 ¦ 10分 ¦ 10분
+1 ảnh ¦ 1 photo ¦ 1 photo ¦ 1 foto ¦ 1 张照片 ¦ 写真1枚 ¦ 사진 1장
+10 ảnh · 2 video ¦ 10 photos · 2 videos ¦ 10 photos · 2 vidéos ¦ 10 fotos · 2 vídeos ¦ 10 张照片 · 2 个视频 ¦ 写真10枚・動画2本 ¦ 사진 10장 · 동영상 2개
+18+ và đồng thuận ¦ 18+ and consent ¦ 18+ et consentement ¦ 18+ y consentimiento ¦ 18+ 与知情同意 ¦ 18歳以上と同意 ¦ 18+와 동의
+20–400 ký tự. Hãy giữ địa chỉ nhà và số điện thoại cho riêng mình. ¦ 20–400 characters. Keep your home address and phone number to yourself. ¦ 20 à 400 caractères. Gardez votre adresse et votre numéro pour vous. ¦ 20–400 caracteres. Guarda para ti tu dirección y tu teléfono. ¦ 20–400 个字符。请勿公开住址和电话号码。 ¦ 20〜400文字。住所や電話番号は書かないでください。 ¦ 20–400자. 집 주소와 전화번호는 공개하지 마세요.
+Ai đó ¦ Someone ¦ Quelqu’un ¦ Alguien ¦ 有人 ¦ 誰か ¦ 누군가
+Báo cáo ¦ Report ¦ Signaler ¦ Denunciar ¦ 举报 ¦ 通報 ¦ 신고
+Báo cáo hồ sơ ¦ Report profile ¦ Signaler le profil ¦ Denunciar perfil ¦ 举报资料 ¦ プロフィールを通報 ¦ 프로필 신고
+Báo cáo và chặn ¦ Report and block ¦ Signaler et bloquer ¦ Denunciar y bloquear ¦ 举报与屏蔽 ¦ 通報とブロック ¦ 신고 및 차단
+Bạn chưa chặn ai. ¦ You haven’t blocked anyone. ¦ Vous n’avez bloqué personne. ¦ No has bloqueado a nadie. ¦ 你还没有屏蔽任何人。 ¦ ブロックした人はいません。 ¦ 차단한 사람이 없어요.
+Bạn chọn chia sẻ bao nhiêu và kết nối với ai. ¦ You choose how much to share and who to connect with. ¦ Vous choisissez ce que vous partagez et avec qui. ¦ Tú eliges cuánto compartir y con quién conectar. ¦ 分享多少、与谁联系，由你决定。 ¦ 何をどこまで共有し、誰とつながるかはあなた次第。 ¦ 얼마나 공유하고 누구와 연결할지 직접 정하세요.
+Bạn có thể bật lại trong cài đặt trình duyệt. ¦ You can turn it back on in your browser settings. ¦ Vous pouvez le réactiver dans les réglages du navigateur. ¦ Puedes activarlo de nuevo en los ajustes del navegador. ¦ 你可以在浏览器设置中重新开启。 ¦ ブラウザの設定から再度オンにできます。 ¦ 브라우저 설정에서 다시 켤 수 있어요.
+Bạn có thể gửi báo cáo ở trang hồ sơ hoặc chặn người khiến bạn không thoải mái. ¦ You can report from a profile page or block anyone who makes you uncomfortable. ¦ Vous pouvez signaler depuis un profil ou bloquer toute personne qui vous met mal à l’aise. ¦ Puedes denunciar desde un perfil o bloquear a quien te incomode. ¦ 你可以在资料页举报，或屏蔽让你不舒服的人。 ¦ プロフィールから通報したり、不快に感じる相手をブロックしたりできます。 ¦ 프로필에서 신고하거나 불편한 사람을 차단할 수 있어요.
+Bạn có thể sửa hồ sơ, xóa từng ảnh/video, ẩn hồ sơ và chặn người khác. Tránh đưa số điện thoại, địa chỉ nhà hoặc lịch sinh hoạt chính xác vào hồ sơ. ¦ You can edit your profile, delete any photo/video, hide your profile and block others. Don’t put your phone number, home address or exact routine in your profile. ¦ Vous pouvez modifier votre profil, supprimer chaque photo/vidéo, masquer votre profil et bloquer d’autres personnes. N’indiquez pas votre numéro, votre adresse ni votre emploi du temps précis. ¦ Puedes editar tu perfil, borrar cada foto/vídeo, ocultar tu perfil y bloquear a otros. No pongas tu teléfono, tu dirección ni tu rutina exacta en el perfil. ¦ 你可以编辑资料、删除任意照片/视频、隐藏资料并屏蔽他人。请勿在资料中填写电话、住址或具体作息。 ¦ プロフィールの編集、写真・動画の削除、非表示、ブロックができます。電話番号や住所、正確な生活パターンは載せないでください。 ¦ 프로필 수정, 사진/동영상 삭제, 프로필 숨기기, 차단이 가능해요. 전화번호, 집 주소, 정확한 일과는 적지 마세요.
+Bạn có thể tắt và xóa vị trí trong mục Riêng tư bất cứ lúc nào. ¦ You can turn off and delete your location in Privacy at any time. ¦ Vous pouvez désactiver et effacer votre position dans Confidentialité à tout moment. ¦ Puedes desactivar y borrar tu ubicación en Privacidad cuando quieras. ¦ 你可以随时在“隐私”中关闭并删除位置。 ¦ 位置情報は「プライバシー」でいつでもオフ・削除できます。 ¦ 개인정보에서 언제든 위치를 끄고 삭제할 수 있어요.
+Bạn có {} tin nhắn chưa đọc ¦ You have {} unread messages ¦ Vous avez {} messages non lus ¦ Tienes {} mensajes sin leer ¦ 你有 {} 条未读消息 ¦ 未読メッセージが {} 件あります ¦ 읽지 않은 메시지 {}개
+Bạn muốn mở lời thế nào? ¦ How would you like to start? ¦ Comment voulez-vous commencer ? ¦ ¿Cómo quieres empezar? ¦ 你想怎么开场？ ¦ どんな言葉で始めますか？ ¦ 어떻게 말을 걸어볼까요?
+Bạn đang mở trong ứng dụng khác (Zalo, Facebook…). ¦ You’re inside another app (Zalo, Facebook…). ¦ Vous êtes dans une autre application (Zalo, Facebook…). ¦ Estás dentro de otra app (Zalo, Facebook…). ¦ 你正在其他应用（Zalo、Facebook…）内打开。 ¦ 他のアプリ（Zalo、Facebook など）内で開いています。 ¦ 다른 앱(Zalo, Facebook 등) 안에서 열려 있어요.
+Bạn đã góp ý trong 24 giờ qua. Cảm ơn bạn, hẹn bạn lần sau! ¦ You already sent feedback in the last 24 hours. Thank you — see you next time! ¦ Vous avez déjà donné votre avis ces dernières 24 h. Merci, à bientôt ! ¦ Ya enviaste tu opinión en las últimas 24 horas. ¡Gracias, hasta la próxima! ¦ 你在过去 24 小时内已提交过反馈。谢谢，下次见！ ¦ 24時間以内にご意見をいただいています。ありがとうございます、またお願いします！ ¦ 24시간 안에 이미 의견을 보내셨어요. 고마워요, 다음에 또 만나요!
+Bạn: {} ¦ You: {} ¦ Vous : {} ¦ Tú: {} ¦ 你：{} ¦ あなた：{} ¦ 나: {}
+Bấm ¦ Tap ¦ Appuyez sur ¦ Toca ¦ 点击 ¦ タップ ¦ 누르기
+Bấm để xem ảnh/video ¦ Tap to view photo/video ¦ Appuyez pour voir la photo/vidéo ¦ Toca para ver la foto/vídeo ¦ 点击查看照片/视频 ¦ タップして写真・動画を見る ¦ 눌러서 사진/동영상 보기
+Bật ¦ Turn on ¦ Activer ¦ Activar ¦ 开启 ¦ オンにする ¦ 켜기
+Bật tìm ở gần ¦ Turn on nearby ¦ Activer « à proximité » ¦ Activar cercanos ¦ 开启附近的人 ¦ 近くを探すをオン ¦ 근처 찾기 켜기
+Bắt đầu bằng một câu hỏi chân thành. ¦ Start with a sincere question. ¦ Commencez par une question sincère. ¦ Empieza con una pregunta sincera. ¦ 从一个真诚的问题开始。 ¦ 心のこもった質問から始めましょう。 ¦ 진심이 담긴 질문으로 시작해 보세요.
+Bỏ ¦ Remove ¦ Retirer ¦ Quitar ¦ 移除 ¦ 外す ¦ 빼기
+Bỏ chặn ¦ Unblock ¦ Débloquer ¦ Desbloquear ¦ 取消屏蔽 ¦ ブロック解除 ¦ 차단 해제
+Bỏ thích ¦ Unlike ¦ Ne plus aimer ¦ Quitar me gusta ¦ 取消喜欢 ¦ いいねを取り消す ¦ 좋아요 취소
+CHI.CH DAO. — Cùng gu, cùng tần số ¦ CHI.CH DAO. — Same type, same wavelength ¦ CHI.CH DAO. — Même style, même longueur d’onde ¦ CHI.CH DAO. — Mismo tipo, misma sintonía ¦ CHI.CH DAO. — 同好同频 ¦ CHI.CH DAO. — 同じ好み、同じ周波数 ¦ CHI.CH DAO. — 같은 취향, 같은 주파수
+Chi tiết ¦ Details ¦ Détails ¦ Detalles ¦ 详情 ¦ 詳細 ¦ 자세히
+Chia sẻ ¦ Share ¦ Partager ¦ Compartir ¦ 分享 ¦ 共有 ¦ 공유
+Chia sẻ vị trí khi bạn muốn. Chỉ hiển thị khoảng cách gần đúng. ¦ Share your location only when you want. Only an approximate distance is shown. ¦ Partagez votre position quand vous le voulez. Seule une distance approximative est affichée. ¦ Comparte tu ubicación solo cuando quieras. Solo se muestra una distancia aproximada. ¦ 想分享时再分享位置，只显示大致距离。 ¦ 共有したいときだけ位置情報を共有。表示されるのはおおよその距離だけです。 ¦ 원할 때만 위치를 공유하세요. 대략적인 거리만 보여요.
+Cho phép người khác tìm thấy bạn ¦ Let others find you ¦ Permettre aux autres de vous trouver ¦ Permitir que otros te encuentren ¦ 允许他人找到你 ¦ 他のユーザーに表示する ¦ 다른 사람이 나를 찾을 수 있게 하기
+Cho phép truy cập vị trí để tìm những người cùng gu quanh bạn. Vị trí được làm tròn trước khi lưu; người khác chỉ thấy khoảng cách gần đúng. Thông tin tự hết hạn sau 24 giờ. ¦ Allow location access to find people with the same type around you. Your location is rounded before it is saved; others only see an approximate distance. It expires after 24 hours. ¦ Autorisez la localisation pour trouver des personnes du même style autour de vous. Elle est arrondie avant d’être enregistrée ; les autres ne voient qu’une distance approximative. Elle expire après 24 h. ¦ Permite el acceso a la ubicación para encontrar gente de tu tipo cerca. Se redondea antes de guardarse; los demás solo ven una distancia aproximada. Caduca a las 24 horas. ¦ 允许访问位置以查找你附近同好的人。位置在保存前会取整，他人只能看到大致距离，24 小时后自动失效。 ¦ 位置情報を許可すると、近くにいる好みの合う人を探せます。保存前に丸められ、他の人にはおおよその距離しか表示されません。24時間で自動的に失効します。 ¦ 위치 접근을 허용하면 주변의 취향이 맞는 사람을 찾을 수 있어요. 저장 전에 반올림되며 다른 사람은 대략적인 거리만 봐요. 24시간 후 자동 만료돼요.
+Cho phép và tìm quanh đây ¦ Allow and search nearby ¦ Autoriser et chercher à proximité ¦ Permitir y buscar cerca ¦ 允许并搜索附近 ¦ 許可して近くを探す ¦ 허용하고 근처 찾기
+Chào bạn, mình thấy chúng ta cùng thích… ¦ Hi, I noticed we both like… ¦ Salut, j’ai vu qu’on aime tous les deux… ¦ Hola, vi que a los dos nos gusta… ¦ 你好，我发现我们都喜欢… ¦ こんにちは、お互い…が好きみたいですね ¦ 안녕하세요, 우리 둘 다 …을 좋아하네요
+Chưa chia sẻ ¦ Not shared ¦ Non partagée ¦ No compartida ¦ 未分享 ¦ 未共有 ¦ 공유 안 함
+Chưa chia sẻ vị trí. ¦ Location not shared. ¦ Position non partagée. ¦ Ubicación no compartida. ¦ 尚未分享位置。 ¦ 位置情報は共有していません。 ¦ 위치를 공유하지 않았어요.
+Chưa có cuộc trò chuyện. ¦ No conversations yet. ¦ Aucune conversation pour l’instant. ¦ Aún no hay conversaciones. ¦ 还没有对话。 ¦ まだ会話がありません。 ¦ 아직 대화가 없어요.
+Chưa có câu thả thính nào. ¦ No flirty lines yet. ¦ Aucune phrase de drague pour l’instant. ¦ Aún no hay frases para ligar. ¦ 还没有撩人语句。 ¦ まだ口説き文句がありません。 ¦ 아직 플러팅 문구가 없어요.
+Chưa có lượt thích. ¦ No likes yet. ¦ Pas encore de « j’aime ». ¦ Aún no hay me gusta. ¦ 还没有喜欢。 ¦ まだいいねがありません。 ¦ 아직 좋아요가 없어요.
+Chưa có tin nhắn. Bắt đầu bằng một câu chào, hoặc bấm 🔥 để thả thính. ¦ No messages yet. Say hi, or tap 🔥 to flirt. ¦ Pas encore de message. Dites bonjour ou appuyez sur 🔥 pour draguer. ¦ Aún no hay mensajes. Saluda o toca 🔥 para ligar. ¦ 还没有消息。打个招呼，或点击 🔥 撩一下。 ¦ まだメッセージがありません。あいさつするか、🔥 で気持ちを伝えましょう。 ¦ 아직 메시지가 없어요. 인사하거나 🔥로 플러팅해 보세요.
+Chưa lấy được vị trí. Hãy kiểm tra quyền vị trí của trình duyệt. ¦ Couldn’t get your location. Check your browser’s location permission. ¦ Impossible d’obtenir votre position. Vérifiez l’autorisation du navigateur. ¦ No se pudo obtener tu ubicación. Revisa el permiso del navegador. ¦ 无法获取位置。请检查浏览器的定位权限。 ¦ 位置情報を取得できませんでした。ブラウザの許可を確認してください。 ¦ 위치를 가져오지 못했어요. 브라우저 위치 권한을 확인하세요.
+Chưa tìm thấy người phù hợp. ¦ No matches found yet. ¦ Aucun profil correspondant pour l’instant. ¦ Aún no hay coincidencias. ¦ 暂未找到合适的人。 ¦ 条件に合う人がまだいません。 ¦ 아직 맞는 사람이 없어요.
+Chưa tải được hồ sơ. ¦ Couldn’t load profiles. ¦ Impossible de charger les profils. ¦ No se pudieron cargar los perfiles. ¦ 无法加载资料。 ¦ プロフィールを読み込めませんでした。 ¦ 프로필을 불러오지 못했어요.
+Chạm một câu để gửi ngay ¦ Tap a line to send it ¦ Touchez une phrase pour l’envoyer ¦ Toca una frase para enviarla ¦ 点一句立即发送 ¦ タップしてすぐ送信 ¦ 문구를 누르면 바로 보내져요
+Chạy bộ / Thể thao ¦ Running / Sports ¦ Course / Sport ¦ Correr / Deporte ¦ 跑步 / 运动 ¦ ランニング / スポーツ ¦ 러닝 / 스포츠
+Chặn hồ sơ ¦ Block profile ¦ Bloquer le profil ¦ Bloquear perfil ¦ 屏蔽资料 ¦ プロフィールをブロック ¦ 프로필 차단
+Chặn hồ sơ này? ¦ Block this profile? ¦ Bloquer ce profil ? ¦ ¿Bloquear este perfil? ¦ 屏蔽此资料？ ¦ このプロフィールをブロックしますか？ ¦ 이 프로필을 차단할까요?
+Chỉ dành cho người từ 18 tuổi. Không quấy rối, ép buộc, miệt thị ngoại hình hoặc đăng ảnh người khác khi chưa được phép. ¦ For people 18 and over only. No harassment, pressure, body-shaming, or posting other people’s photos without permission. ¦ Réservé aux 18 ans et plus. Pas de harcèlement, de pression, de moqueries sur le physique ni de photos d’autrui sans accord. ¦ Solo para mayores de 18 años. Nada de acoso, presión, burlas por el físico ni fotos de otros sin permiso. ¦ 仅限 18 岁及以上。禁止骚扰、强迫、外貌羞辱或未经许可发布他人照片。 ¦ 18歳以上限定。嫌がらせ、強要、容姿への中傷、無断で他人の写真を載せることは禁止です。 ¦ 만 18세 이상만 이용할 수 있어요. 괴롭힘, 강요, 외모 비하, 허락 없는 타인 사진 게시는 금지예요.
+Chỉ nhận ảnh JPG, PNG, WebP hoặc HEIC. ¦ Only JPG, PNG, WebP or HEIC images. ¦ Images JPG, PNG, WebP ou HEIC uniquement. ¦ Solo imágenes JPG, PNG, WebP o HEIC. ¦ 仅支持 JPG、PNG、WebP 或 HEIC 图片。 ¦ JPG、PNG、WebP、HEIC 画像のみ対応しています。 ¦ JPG, PNG, WebP, HEIC 이미지만 가능해요.
+Chọn một mục ¦ Choose one ¦ Choisissez ¦ Elige una opción ¦ 请选择 ¦ 選択してください ¦ 선택하세요
+Chủ động bảo vệ mình ¦ Look after yourself ¦ Protégez-vous ¦ Protégete ¦ 主动保护自己 ¦ 自分の身を守る ¦ 스스로를 보호하세요
+Cuộc sống giản dị ¦ Simple living ¦ Vie simple ¦ Vida sencilla ¦ 简单生活 ¦ シンプルな暮らし ¦ 소박한 삶
+Cuộc trò chuyện đang mở ¦ Open conversations ¦ Conversations ouvertes ¦ Conversaciones abiertas ¦ 进行中的对话 ¦ 開いている会話 ¦ 열린 대화
+CÙNG GU. CÙNG TẦN SỐ. ¦ SAME TYPE. SAME WAVELENGTH. ¦ MÊME STYLE. MÊME LONGUEUR D’ONDE. ¦ MISMO TIPO. MISMA SINTONÍA. ¦ 同好。同频。 ¦ 同じ好み。同じ周波数。 ¦ 같은 취향. 같은 주파수.
+Cài CHI.CH DAO. lên màn hình chính ¦ Add CHI.CH DAO. to your home screen ¦ Ajouter CHI.CH DAO. à l’écran d’accueil ¦ Añade CHI.CH DAO. a tu pantalla de inicio ¦ 将 CHI.CH DAO. 添加到主屏幕 ¦ CHI.CH DAO. をホーム画面に追加 ¦ CHI.CH DAO.를 홈 화면에 추가
+Cài app ¦ Install app ¦ Installer l’app ¦ Instalar app ¦ 安装应用 ¦ アプリをインストール ¦ 앱 설치
+Cài ứng dụng ¦ Install app ¦ Installer l’application ¦ Instalar aplicación ¦ 安装应用 ¦ アプリをインストール ¦ 앱 설치
+Các cuộc trò chuyện khác ¦ Other conversations ¦ Autres conversations ¦ Otras conversaciones ¦ 其他对话 ¦ 他の会話 ¦ 다른 대화
+Các khung trò chuyện ¦ Chat windows ¦ Fenêtres de discussion ¦ Ventanas de chat ¦ 聊天窗口 ¦ チャットウィンドウ ¦ 채팅 창
+Cách vận động ¦ Way of moving ¦ Activité physique ¦ Forma de moverte ¦ 运动方式 ¦ 体の動かし方 ¦ 운동 방식
+Cách vận động (tùy chọn) ¦ Way of moving (optional) ¦ Activité physique (facultatif) ¦ Forma de moverte (opcional) ¦ 运动方式（可选） ¦ 体の動かし方（任意） ¦ 운동 방식 (선택)
+Còn thiếu: {}. Hoàn thiện để xuất hiện trong Khám phá và nhắn tin. ¦ Missing: {}. Complete it to appear in Discover and send messages. ¦ Il manque : {}. Complétez pour apparaître dans Découvrir et envoyer des messages. ¦ Falta: {}. Complétalo para aparecer en Descubrir y enviar mensajes. ¦ 缺少：{}。完善后即可出现在“发现”中并发送消息。 ¦ 未入力：{}。入力すると「見つける」に表示され、メッセージを送れます。 ¦ 부족한 항목: {}. 완성하면 탐색에 표시되고 메시지를 보낼 수 있어요.
+Công nhân / Thợ kỹ thuật ¦ Worker / Technician ¦ Ouvrier / Technicien ¦ Obrero / Técnico ¦ 工人 / 技师 ¦ 作業員 / 技術者 ¦ 노동자 / 기술자
+Cùng gu hình thể. ¦ Same physique type. ¦ Même style physique. ¦ Mismo tipo físico. ¦ 身材同好。 ¦ 体型の好みが同じ。 ¦ 같은 몸매 취향.
+Cùng gu hình thể. Hợp gu hẹn hò. ¦ Same type. Great dates. ¦ Même style. Belles rencontres. ¦ Mismo tipo. Buenas citas. ¦ 身材同好，约会合拍。 ¦ 好みが同じ。デートも合う。 ¦ 같은 취향. 잘 맞는 데이트.
+Cơ bắp rõ nét ¦ Well-defined muscles ¦ Muscles bien dessinés ¦ Músculos marcados ¦ 肌肉线条分明 ¦ くっきりした筋肉 ¦ 선명한 근육
+Cảm ơn bạn! ¦ Thank you! ¦ Merci ! ¦ ¡Gracias! ¦ 谢谢你！ ¦ ありがとうございます！ ¦ 고마워요!
+Cảm ơn bạn! Mở CHI.CH DAO. từ biểu tượng trên màn hình chính nhé. ¦ Thanks! Open CHI.CH DAO. from the icon on your home screen. ¦ Merci ! Ouvrez CHI.CH DAO. depuis l’icône de l’écran d’accueil. ¦ ¡Gracias! Abre CHI.CH DAO. desde el icono de tu pantalla de inicio. ¦ 谢谢！请从主屏幕图标打开 CHI.CH DAO.。 ¦ ありがとうございます！ホーム画面のアイコンから CHI.CH DAO. を開いてください。 ¦ 고마워요! 홈 화면 아이콘으로 CHI.CH DAO.를 열어 주세요.
+Cập nhật ¦ Update ¦ Mettre à jour ¦ Actualizar ¦ 更新 ¦ 更新 ¦ 업데이트
+Cập nhật vị trí ¦ Update location ¦ Mettre à jour la position ¦ Actualizar ubicación ¦ 更新位置 ¦ 位置情報を更新 ¦ 위치 업데이트
+Dành cho những kết nối có gu ¦ For connections with taste ¦ Pour des rencontres qui ont du goût ¦ Para conexiones con buen gusto ¦ 为有品味的连接而生 ¦ センスのある出会いのために ¦ 취향 있는 만남을 위해
+File này sẽ được gỡ khỏi hồ sơ và kho lưu trữ. ¦ This file will be removed from your profile and storage. ¦ Ce fichier sera retiré de votre profil et du stockage. ¦ Este archivo se quitará de tu perfil y del almacenamiento. ¦ 该文件将从资料和存储中移除。 ¦ このファイルはプロフィールとストレージから削除されます。 ¦ 이 파일은 프로필과 저장소에서 삭제돼요.
+Ghé Khám phá và lưu người bạn muốn làm quen. ¦ Visit Discover and save the people you’d like to meet. ¦ Passez par Découvrir et enregistrez les personnes que vous aimeriez rencontrer. ¦ Pasa por Descubrir y guarda a quien quieras conocer. ¦ 去“发现”看看，收藏想认识的人。 ¦ 「見つける」で気になる人を保存しましょう。 ¦ 탐색에서 알고 싶은 사람을 저장해 보세요.
+Giả mạo danh tính ¦ Fake identity ¦ Usurpation d’identité ¦ Suplantación de identidad ¦ 冒充身份 ¦ なりすまし ¦ 신분 사칭
+Giới thiệu ¦ About ¦ À propos ¦ Sobre mí ¦ 简介 ¦ 自己紹介 ¦ 소개
+Gu của bạn, nhiều hơn một kiểu. ¦ Your type, more than one kind. ¦ Votre style, bien plus qu’un seul. ¦ Tu tipo, más de una clase. ¦ 你的喜好，不止一种。 ¦ あなたの好みは、ひとつじゃない。 ¦ 당신의 취향은 한 가지가 아니에요.
+Góp ý ¦ Feedback ¦ Avis ¦ Opinión ¦ 反馈 ¦ ご意見 ¦ 의견
+Góp ý cho CHI.CH DAO. ¦ Feedback for CHI.CH DAO. ¦ Votre avis sur CHI.CH DAO. ¦ Opinión sobre CHI.CH DAO. ¦ 给 CHI.CH DAO. 的反馈 ¦ CHI.CH DAO. へのご意見 ¦ CHI.CH DAO.에 의견 보내기
+Góp ý cần ít nhất 5 ký tự. ¦ Feedback needs at least 5 characters. ¦ L’avis doit contenir au moins 5 caractères. ¦ La opinión necesita al menos 5 caracteres. ¦ 反馈至少需要 5 个字符。 ¦ 5文字以上入力してください。 ¦ 의견은 5자 이상이어야 해요.
+Góp ý đã được gửi tới đội ngũ CHI.CH DAO. ¦ Your feedback has been sent to the CHI.CH DAO. team. ¦ Votre avis a été envoyé à l’équipe CHI.CH DAO. ¦ Tu opinión se envió al equipo de CHI.CH DAO. ¦ 反馈已发送给 CHI.CH DAO. 团队。 ¦ ご意見を CHI.CH DAO. チームに送信しました。 ¦ 의견이 CHI.CH DAO. 팀에 전달됐어요.
+Gần gũi thiên nhiên ¦ Close to nature ¦ Proche de la nature ¦ Cerca de la naturaleza ¦ 亲近自然 ¦ 自然派 ¦ 자연 친화적
+Gọn khỏe ¦ Lean and fit ¦ Sec et en forme ¦ Delgado y en forma ¦ 精瘦健康 ¦ 引き締まった体 ¦ 탄탄하고 슬림
+Gửi ¦ Send ¦ Envoyer ¦ Enviar ¦ 发送 ¦ 送信 ¦ 보내기
+Gửi báo cáo ¦ Send report ¦ Envoyer le signalement ¦ Enviar denuncia ¦ 提交举报 ¦ 通報を送信 ¦ 신고 보내기
+Gửi góp ý ¦ Send feedback ¦ Envoyer l’avis ¦ Enviar opinión ¦ 提交反馈 ¦ 送信する ¦ 의견 보내기
+Gửi lời mở đầu ↗ ¦ Send opener ↗ ¦ Envoyer le premier message ↗ ¦ Enviar primer mensaje ↗ ¦ 发送开场白 ↗ ¦ 最初のメッセージを送る ↗ ¦ 첫 메시지 보내기 ↗
+Gửi một lời chào từ hồ sơ bạn muốn tìm hiểu. ¦ Say hi from the profile of someone you’d like to know. ¦ Dites bonjour depuis le profil de quelqu’un qui vous plaît. ¦ Saluda desde el perfil de alguien que quieras conocer. ¦ 在想认识的人的资料页打个招呼吧。 ¦ 気になる人のプロフィールからあいさつしましょう。 ¦ 알고 싶은 사람의 프로필에서 인사해 보세요.
+Gửi ảnh hoặc video ¦ Send a photo or video ¦ Envoyer une photo ou une vidéo ¦ Enviar foto o vídeo ¦ 发送照片或视频 ¦ 写真・動画を送る ¦ 사진 또는 동영상 보내기
+Gửi ↗ ¦ Send ↗ ¦ Envoyer ↗ ¦ Enviar ↗ ¦ 发送 ↗ ¦ 送信 ↗ ¦ 보내기 ↗
+Hai bạn sẽ không thể tìm thấy nhau hoặc gửi tin nhắn cho nhau. ¦ You won’t be able to find or message each other. ¦ Vous ne pourrez plus vous trouver ni vous écrire. ¦ No podréis encontraros ni escribiros. ¦ 你们将无法互相找到或发送消息。 ¦ お互いに見つけることもメッセージを送ることもできなくなります。 ¦ 서로 찾거나 메시지를 보낼 수 없게 돼요.
+Hiển thị hồ sơ ¦ Profile visibility ¦ Visibilité du profil ¦ Visibilidad del perfil ¦ 资料可见性 ¦ プロフィールの表示 ¦ 프로필 공개
+Hiện thông báo của hệ điều hành khi bạn đang làm việc khác. ¦ Show system notifications while you’re doing something else. ¦ Affiche les notifications du système quand vous faites autre chose. ¦ Muestra notificaciones del sistema mientras haces otra cosa. ¦ 在你做其他事时显示系统通知。 ¦ 他の作業中にシステム通知を表示します。 ¦ 다른 일을 할 때 시스템 알림을 표시해요.
+Hoàn thiện hồ sơ (kèm ít nhất 1 ảnh) để nhắn tin và thả thính. ¦ Complete your profile (with at least 1 photo) to message and flirt. ¦ Complétez votre profil (avec au moins 1 photo) pour écrire et draguer. ¦ Completa tu perfil (con al menos 1 foto) para escribir y ligar. ¦ 完善资料（至少 1 张照片）后才能发消息和撩人。 ¦ メッセージを送るにはプロフィール（写真1枚以上）を完成させてください。 ¦ 메시지와 플러팅을 하려면 프로필(사진 1장 이상)을 완성하세요.
+Hoàn thiện ngay ¦ Complete now ¦ Compléter maintenant ¦ Completar ahora ¦ 立即完善 ¦ 今すぐ完成させる ¦ 지금 완성하기
+Hãy bấm ⋯ và chọn ¦ Tap ⋯ and choose ¦ Appuyez sur ⋯ et choisissez ¦ Toca ⋯ y elige ¦ 点击 ⋯ 并选择 ¦ ⋯ をタップして次を選択 ¦ ⋯를 누르고 다음을 선택하세요
+Hình thể thu hút. ¦ The look attracts. ¦ Le physique attire. ¦ El físico atrae. ¦ 身材吸引人。 ¦ 体つきで惹かれ、 ¦ 몸매가 끌리고,
+Hẹn hò an tâm ¦ Date with peace of mind ¦ Des rencontres en confiance ¦ Citas con tranquilidad ¦ 安心约会 ¦ 安心してデート ¦ 안심하고 데이트
+Hẹn hò thoải mái ¦ Casual dating ¦ Rencontres sans prise de tête ¦ Citas casuales ¦ 轻松约会 ¦ 気軽なデート ¦ 가벼운 데이트
+Hỏi trước khi chia sẻ nội dung riêng tư. Ưu tiên địa điểm công cộng khi gặp lần đầu; không chuyển tiền chỉ vì lời hứa hẹn. ¦ Ask before sharing private content. Meet in public places the first time; never send money because of a promise. ¦ Demandez avant de partager du contenu privé. Privilégiez un lieu public pour la première rencontre ; n’envoyez jamais d’argent sur une simple promesse. ¦ Pregunta antes de compartir contenido privado. Queda en lugares públicos la primera vez; nunca envíes dinero por una promesa. ¦ 分享私密内容前先询问。第一次见面选择公共场所；不要因为承诺而转账。 ¦ プライベートな内容を送る前に確認を。初対面は人の多い場所で。約束だけでお金を送らないでください。 ¦ 사적인 콘텐츠는 먼저 물어보고 공유하세요. 첫 만남은 공공장소에서, 약속만 믿고 돈을 보내지 마세요.
+Hỏi trước khi chia sẻ ảnh riêng tư. Tôn trọng ranh giới và lựa chọn của nhau. ¦ Ask before sharing private photos. Respect each other’s boundaries and choices. ¦ Demandez avant de partager des photos privées. Respectez les limites et les choix de chacun. ¦ Pregunta antes de compartir fotos privadas. Respeta los límites y decisiones del otro. ¦ 分享私密照片前先询问。尊重彼此的界限与选择。 ¦ プライベートな写真は送る前に確認を。お互いの境界と選択を尊重しましょう。 ¦ 사적인 사진은 먼저 물어보고 공유하세요. 서로의 경계와 선택을 존중해요.
+Hồ sơ chân thật ¦ Genuine profiles ¦ Des profils authentiques ¦ Perfiles auténticos ¦ 真实资料 ¦ 本物のプロフィール ¦ 진짜 프로필
+Hồ sơ của bạn ¦ Your profile ¦ Votre profil ¦ Tu perfil ¦ 你的资料 ¦ あなたのプロフィール ¦ 내 프로필
+Hồ sơ của tôi ¦ My profile ¦ Mon profil ¦ Mi perfil ¦ 我的资料 ¦ マイプロフィール ¦ 내 프로필

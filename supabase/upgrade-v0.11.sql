@@ -4,6 +4,7 @@ begin;
 alter table public.cd_media drop constraint if exists cd_media_purpose_check;
 alter table public.cd_media add constraint cd_media_purpose_check check(purpose in ('profile','hero','chat','slide','sample'));
 alter table public.cd_settings add column if not exists samples_enabled boolean not null default false;
+alter table chich_private.accounts add column if not exists lang text check(lang in ('vi','en','fr','es','zh','ja','ko'));
 alter table public.cd_settings add column if not exists grid_cols integer not null default 3 check(grid_cols between 2 and 6);
 alter table public.cd_settings add column if not exists grid_cols_mobile integer not null default 2 check(grid_cols_mobile between 1 and 2);
 alter table public.cd_messages add column if not exists read_at timestamptz;
@@ -108,8 +109,12 @@ begin
  end if;
 
  if p_action in ('me','session') then
-  return chich_private.profile_json(p)||jsonb_build_object('admin',admin,'appInstalled',exists(select 1 from chich_private.accounts where user_id=p_actor and app_installed_at is not null),'nearbyEnabled',exists(select 1 from chich_private.locations where user_id=p_actor and updated_at>now()-interval '24 hours'),
+  return chich_private.profile_json(p)||jsonb_build_object('admin',admin,'lang',(select lang from chich_private.accounts where user_id=p_actor),'appInstalled',exists(select 1 from chich_private.accounts where user_id=p_actor and app_installed_at is not null),'nearbyEnabled',exists(select 1 from chich_private.locations where user_id=p_actor and updated_at>now()-interval '24 hours'),
   'likes',coalesce((select jsonb_agg(target_id) from public.cd_likes where user_id=p_actor),'[]'));
+ elsif p_action='set_lang' then
+  if coalesce(p_data->>'lang','') not in ('vi','en','fr','es','zh','ja','ko') then raise exception 'Ngôn ngữ không hợp lệ.'; end if;
+  update chich_private.accounts set lang=p_data->>'lang' where user_id=p_actor;
+  return jsonb_build_object('lang',p_data->>'lang');
  elsif p_action='accept_adult' then
   update public.cd_profiles set adult_accepted_at=coalesce(adult_accepted_at,now()) where id=p_actor;
   return '{}';

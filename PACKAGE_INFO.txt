@@ -1,4 +1,4 @@
-CHI.CH DAO. export v0.11.1
-Frontend: dist/ (Vercel) · Admin: dist/admin.html
-API Worker: cloudflare/worker.js (CHANGED — paste again: delete user, image-by-link, instant B2 cleanup)
+CHI.CH DAO. export v0.12.0
+Frontend: dist/ (Vercel) · Admin: dist/admin.html · Languages: dist/i18n/*.json (source: i18n-src/)
+API Worker: cloudflare/worker.js (unchanged since v0.11.1)
 Database: supabase/chichdao-full.sql — ONE file, run once (fresh install or upgrade, keeps data)

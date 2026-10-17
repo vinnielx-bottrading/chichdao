@@ -1,0 +1,140 @@
+Hồ sơ hoàn thiện {}/{} ¦ Profile {}/{} complete ¦ Profil complété {}/{} ¦ Perfil completo {}/{} ¦ 资料完成度 {}/{} ¦ プロフィール完成 {}/{} ¦ 프로필 완성 {}/{}
+Hồ sơ minh họa ¦ Sample profile ¦ Profil d’exemple ¦ Perfil de ejemplo ¦ 示例资料 ¦ サンプルプロフィール ¦ 예시 프로필
+Hồ sơ minh họa {} ¦ Sample profile {} ¦ Profil d’exemple {} ¦ Perfil de ejemplo {} ¦ 示例资料 {} ¦ サンプルプロフィール {} ¦ 예시 프로필 {}
+Hồ sơ minh họa · không nhắn tin được ¦ Sample profile · can’t be messaged ¦ Profil d’exemple · pas de messages ¦ Perfil de ejemplo · sin mensajes ¦ 示例资料 · 无法发消息 ¦ サンプル · メッセージ不可 ¦ 예시 프로필 · 메시지 불가
+Hồ sơ đã chặn ¦ Blocked profiles ¦ Profils bloqués ¦ Perfiles bloqueados ¦ 已屏蔽的资料 ¦ ブロックしたプロフィール ¦ 차단한 프로필
+Hồ sơ đã hoàn thiện ¦ Profile complete ¦ Profil complet ¦ Perfil completo ¦ 资料已完善 ¦ プロフィール完成 ¦ 프로필 완성됨
+Hồ sơ ↗ ¦ Profile ↗ ¦ Profil ↗ ¦ Perfil ↗ ¦ 资料 ↗ ¦ プロフィール ↗ ¦ 프로필 ↗
+Hồ sơ, kết nối và tin nhắn được lưu để phục vụ việc làm quen. Ảnh và video trong hồ sơ có thể được xem bởi thành viên đăng nhập khi bạn bật hiển thị hồ sơ. ¦ Profiles, connections and messages are stored so people can get to know each other. Profile photos and videos can be seen by signed-in members when your profile is visible. ¦ Les profils, connexions et messages sont conservés pour permettre les rencontres. Les photos et vidéos du profil sont visibles par les membres connectés lorsque votre profil est visible. ¦ Los perfiles, conexiones y mensajes se guardan para facilitar conocerse. Los miembros con sesión iniciada pueden ver tus fotos y vídeos si tu perfil es visible. ¦ 资料、连接和消息会被保存以便相识。资料可见时，已登录的会员可以查看你的照片和视频。 ¦ プロフィール、つながり、メッセージは出会いのために保存されます。プロフィールを公開中は、ログイン中のメンバーが写真や動画を見られます。 ¦ 프로필, 연결, 메시지는 서로 알아가기 위해 저장돼요. 프로필이 공개 상태이면 로그인한 회원이 사진과 동영상을 볼 수 있어요.
+Hợp gu hẹn hò. ¦ Great dates. ¦ Belles rencontres. ¦ Buenas citas. ¦ 约会合拍。 ¦ デートも合う。 ¦ 잘 맞는 데이트.
+Khoảng cách ¦ Distance ¦ Distance ¦ Distancia ¦ 距离 ¦ 距離 ¦ 거리
+Khu vực ¦ Area ¦ Région ¦ Zona ¦ 地区 ¦ エリア ¦ 지역
+Khu vực (Hà Nội, Bangkok…) ¦ Area (Hanoi, Bangkok…) ¦ Région (Hanoï, Bangkok…) ¦ Zona (Hanói, Bangkok…) ¦ 地区（河内、曼谷…） ¦ エリア（ハノイ、バンコク…） ¦ 지역 (하노이, 방콕…)
+Khu vực · tỉnh/thành, thành phố hoặc quốc gia ¦ Area · province, city or country ¦ Région · province, ville ou pays ¦ Zona · provincia, ciudad o país ¦ 地区 · 省份、城市或国家 ¦ エリア · 都道府県・市・国 ¦ 지역 · 도, 도시 또는 국가
+Khác ¦ Other ¦ Autre ¦ Otro ¦ 其他 ¦ その他 ¦ 기타
+Khám phá ¦ Discover ¦ Découvrir ¦ Descubrir ¦ 发现 ¦ 見つける ¦ 탐색
+Khám phá cộng đồng ¦ Explore the community ¦ Explorez la communauté ¦ Explora la comunidad ¦ 探索社区 ¦ コミュニティを見る ¦ 커뮤니티 둘러보기
+Không ¦ None ¦ Non ¦ No ¦ 不 ¦ なし ¦ 안 함
+Không cần tập gym để có sức hút riêng. ¦ You don’t need the gym to have your own appeal. ¦ Pas besoin de salle de sport pour avoir du charme. ¦ No hace falta el gimnasio para tener atractivo. ¦ 不去健身房也有自己的魅力。 ¦ ジムに通わなくても、あなたの魅力はある。 ¦ 헬스장에 안 가도 나만의 매력이 있어요.
+Không gian dành cho nam giới ¦ A space for men ¦ Un espace pour les hommes ¦ Un espacio para hombres ¦ 男性专属空间 ¦ 男性のための場所 ¦ 남성을 위한 공간
+Không gian hẹn hò nam–nam 18+ dành cho những người yêu sức hút khỏe khoắn — từ phòng tập đến những nhịp sống đời thường. ¦ An 18+ space for men dating men who love a healthy, fit appeal — from the gym to everyday life. ¦ Un espace de rencontres entre hommes 18+ pour ceux qui aiment un charme sain et sportif — de la salle de sport à la vie de tous les jours. ¦ Un espacio de citas entre hombres 18+ para quienes aman un atractivo sano y en forma — del gimnasio a la vida diaria. ¦ 18+ 男男约会空间，献给喜欢健康魅力的人——从健身房到日常生活。 ¦ 健康的な魅力が好きな男性同士のための18歳以上の出会いの場。ジムから日常まで。 ¦ 건강한 매력을 좋아하는 남성들을 위한 18+ 데이팅 공간 — 헬스장부터 일상까지.
+Không gian hẹn hò nam–nam dành cho người ¦ A men-for-men dating space for people ¦ Un espace de rencontres entre hommes pour les personnes ¦ Un espacio de citas entre hombres para personas ¦ 男男约会空间，仅限 ¦ 男性同士の出会いの場。対象は ¦ 남성 간 데이팅 공간, 대상:
+Không giới hạn ¦ Any ¦ Peu importe ¦ Cualquiera ¦ 不限 ¦ 指定なし ¦ 제한 없음
+Không tập cố định ¦ No fixed routine ¦ Pas de routine fixe ¦ Sin rutina fija ¦ 不固定锻炼 ¦ 決まった運動なし ¦ 정해진 운동 없음
+Kinh doanh / Tự do ¦ Business / Freelance ¦ Commerce / Indépendant ¦ Negocios / Autónomo ¦ 经商 / 自由职业 ¦ 自営業 / フリーランス ¦ 사업 / 프리랜서
+Kéo xuống, chọn ¦ Scroll down, choose ¦ Faites défiler, choisissez ¦ Desplázate y elige ¦ 向下滑动，选择 ¦ 下にスクロールして選択 ¦ 아래로 내려 선택:
+KẾT NỐI CỦA BẠN ¦ YOUR CONNECTIONS ¦ VOS CONNEXIONS ¦ TUS CONEXIONES ¦ 你的连接 ¦ あなたのつながり ¦ 나의 연결
+Kết nối ¦ Connections ¦ Connexions ¦ Conexiones ¦ 连接 ¦ つながり ¦ 연결
+Kết nối của bạn ¦ Your connections ¦ Vos connexions ¦ Tus conexiones ¦ 你的连接 ¦ あなたのつながり ¦ 나의 연결
+Làm mới cuộc trò chuyện ¦ Refresh conversation ¦ Actualiser la conversation ¦ Actualizar conversación ¦ 刷新对话 ¦ 会話を更新 ¦ 대화 새로고침
+Lý do ¦ Reason ¦ Motif ¦ Motivo ¦ 原因 ¦ 理由 ¦ 사유
+Lý do khác ¦ Other reason ¦ Autre motif ¦ Otro motivo ¦ 其他原因 ¦ その他の理由 ¦ 기타 사유
+Lưu hồ sơ ↗ ¦ Save profile ↗ ¦ Enregistrer le profil ↗ ¦ Guardar perfil ↗ ¦ 保存资料 ↗ ¦ プロフィールを保存 ↗ ¦ 프로필 저장 ↗
+Lọc khu vực, gõ tên tỉnh, thành phố hoặc quốc gia ¦ Filter by area: type a province, city or country ¦ Filtrer par région : saisissez une province, une ville ou un pays ¦ Filtrar por zona: escribe provincia, ciudad o país ¦ 按地区筛选：输入省份、城市或国家 ¦ エリアで絞り込み：都道府県・市・国を入力 ¦ 지역 필터: 도, 도시 또는 국가 입력
+Lọc mục đích kết nối ¦ Filter by what you’re looking for ¦ Filtrer par recherche ¦ Filtrar por lo que buscas ¦ 按交友目的筛选 ¦ 目的で絞り込み ¦ 원하는 관계로 필터
+Lọc nghề nghiệp ¦ Filter by job ¦ Filtrer par métier ¦ Filtrar por trabajo ¦ 按职业筛选 ¦ 職業で絞り込み ¦ 직업 필터
+Lọc thêm ¦ More filters ¦ Plus de filtres ¦ Más filtros ¦ 更多筛选 ¦ 詳細フィルター ¦ 필터 더보기
+Lối sống ¦ Lifestyle ¦ Mode de vie ¦ Estilo de vida ¦ 生活方式 ¦ ライフスタイル ¦ 라이프스타일
+Lối sống (tùy chọn) ¦ Lifestyle (optional) ¦ Mode de vie (facultatif) ¦ Estilo de vida (opcional) ¦ 生活方式（可选） ¦ ライフスタイル（任意） ¦ 라이프스타일 (선택)
+Lỗi ¦ Error ¦ Erreur ¦ Error ¦ 错误 ¦ エラー ¦ 오류
+MINH HỌA ¦ SAMPLE ¦ EXEMPLE ¦ EJEMPLO ¦ 示例 ¦ サンプル ¦ 예시
+Mong muốn ¦ Looking for ¦ Recherche ¦ Busco ¦ 期望 ¦ 希望 ¦ 원하는 관계
+Mong muốn kết nối ¦ Looking for ¦ Ce que je recherche ¦ Lo que busco ¦ 交友目的 ¦ 求めている関係 ¦ 원하는 관계
+Máy chủ chưa sẵn sàng (database chưa cập nhật). Vui lòng thử lại sau. ¦ The server isn’t ready yet (database not updated). Please try again later. ¦ Le serveur n’est pas prêt (base de données non mise à jour). Réessayez plus tard. ¦ El servidor aún no está listo (base de datos sin actualizar). Inténtalo más tarde. ¦ 服务器尚未就绪（数据库未更新）。请稍后再试。 ¦ サーバーの準備ができていません（データベース未更新）。しばらくしてからお試しください。 ¦ 서버가 아직 준비되지 않았어요(데이터베이스 미업데이트). 잠시 후 다시 시도하세요.
+Mô tả thêm ¦ More details ¦ Précisions ¦ Más detalles ¦ 补充说明 ¦ 詳細 ¦ 추가 설명
+Mật khẩu ¦ Password ¦ Mot de passe ¦ Contraseña ¦ 密码 ¦ パスワード ¦ 비밀번호
+Mọi khoảng cách ¦ Any distance ¦ Toute distance ¦ Cualquier distancia ¦ 不限距离 ¦ すべての距離 ¦ 모든 거리
+Mối quan hệ nghiêm túc ¦ Serious relationship ¦ Relation sérieuse ¦ Relación seria ¦ 认真恋爱 ¦ 真剣な交際 ¦ 진지한 관계
+Mỗi hồ sơ tối đa 10 ảnh và 2 video. ¦ Each profile can have up to 10 photos and 2 videos. ¦ Chaque profil peut avoir jusqu’à 10 photos et 2 vidéos. ¦ Cada perfil admite hasta 10 fotos y 2 vídeos. ¦ 每份资料最多 10 张照片和 2 个视频。 ¦ 写真は最大10枚、動画は2本までです。 ¦ 프로필당 사진 10장, 동영상 2개까지예요.
+Mỗi người nhắn đến mở một khung chat ở góc phải, kể cả khi bạn đang xem trang khác. Trên điện thoại, tin mới hiện số đỏ ở mục Tin nhắn. ¦ Each person who messages you opens a chat window at the bottom right, even on other pages. On phones, new messages show a red badge on Messages. ¦ Chaque personne qui vous écrit ouvre une fenêtre en bas à droite, même sur d’autres pages. Sur mobile, un badge rouge apparaît sur Messages. ¦ Cada persona que te escribe abre una ventana abajo a la derecha, incluso en otras páginas. En el móvil, aparece un número rojo en Mensajes. ¦ 每个给你发消息的人都会在右下角打开聊天窗口，即使你在其他页面。手机上，“消息”会显示红色数字。 ¦ メッセージが届くと、他のページを見ていても右下にチャットが開きます。スマホでは「メッセージ」に赤い数字が表示されます。 ¦ 메시지를 보낸 사람마다 오른쪽 아래에 채팅 창이 열려요(다른 페이지에서도). 휴대폰에서는 메시지에 빨간 숫자가 표시돼요.
+MỘT GÓC ĐỜI THƯỜNG ¦ A SLICE OF EVERYDAY LIFE ¦ UN BOUT DE QUOTIDIEN ¦ UN TROZO DE LA VIDA DIARIA ¦ 日常一角 ¦ 日常のひとこま ¦ 일상의 한 조각
+MỘT KHÔNG GIAN CÙNG GU · 18+ ¦ A SPACE FOR YOUR TYPE · 18+ ¦ UN ESPACE ENTRE AFFINITÉS · 18+ ¦ UN ESPACIO DE AFINIDAD · 18+ ¦ 同好空间 · 18+ ¦ 好みが合う場所 · 18+ ¦ 취향이 맞는 공간 · 18+
+Một chút về bạn ¦ A bit about you ¦ Un peu sur vous ¦ Un poco sobre ti ¦ 关于你 ¦ あなたについて ¦ 나에 대해
+Một chút về hình thể. Nhiều hơn về con người bạn. ¦ A little about your body. More about who you are. ¦ Un peu sur votre physique. Beaucoup plus sur qui vous êtes. ¦ Un poco sobre tu físico. Mucho más sobre quién eres. ¦ 一点关于身材，更多关于你这个人。 ¦ 体のことを少し、あなた自身のことをもっと。 ¦ 몸매는 조금, 당신이라는 사람은 더 많이.
+Một câu chuyện mới. ¦ A new story. ¦ Une nouvelle histoire. ¦ Una nueva historia. ¦ 一段新故事。 ¦ 新しい物語。 ¦ 새로운 이야기.
+Một góc đời thường ¦ A slice of everyday life ¦ Un bout de quotidien ¦ Un trozo de la vida diaria ¦ 日常一角 ¦ 日常のひとこま ¦ 일상의 한 조각
+Một kết nối mới bắt đầu từ đây. ¦ A new connection starts here. ¦ Une nouvelle rencontre commence ici. ¦ Una nueva conexión empieza aquí. ¦ 新的连接从这里开始。 ¦ 新しいつながりはここから。 ¦ 새로운 연결이 여기서 시작돼요.
+Một kết nối tốt bắt đầu từ sự tôn trọng. ¦ A good connection starts with respect. ¦ Une belle rencontre commence par le respect. ¦ Una buena conexión empieza con respeto. ¦ 好的连接始于尊重。 ¦ 良いつながりは尊重から。 ¦ 좋은 연결은 존중에서 시작돼요.
+Một lời chào, một kết nối mới ¦ One hello, one new connection ¦ Un bonjour, une nouvelle rencontre ¦ Un hola, una nueva conexión ¦ 一声问候，一段新连接 ¦ ひとことのあいさつから新しいつながりを ¦ 인사 한마디, 새로운 연결
+Một lời chào, một kết nối mới… ¦ One hello, one new connection… ¦ Un bonjour, une nouvelle rencontre… ¦ Un hola, una nueva conexión… ¦ 一声问候，一段新连接… ¦ ひとことのあいさつから… ¦ 인사 한마디, 새로운 연결…
+Một người ¦ Someone ¦ Quelqu’un ¦ Alguien ¦ 有人 ¦ 誰か ¦ 누군가
+Một người cùng gu ¦ Someone with your taste ¦ Quelqu’un qui partage vos goûts ¦ Alguien de tu tipo ¦ 同好之人 ¦ 好みが合う人 ¦ 취향이 맞는 사람
+Một tiếng "ting" nhỏ khi có tin mới. ¦ A small “ding” for new messages. ¦ Un petit « ding » à chaque nouveau message. ¦ Un pequeño “ding” con cada mensaje nuevo. ¦ 新消息时“叮”一声。 ¦ 新着メッセージで小さく「ピン」と鳴ります。 ¦ 새 메시지가 오면 작게 “띵” 울려요.
+Mở bằng Safari ¦ Open in Safari ¦ Ouvrir dans Safari ¦ Abrir en Safari ¦ 用 Safari 打开 ¦ Safari で開く ¦ Safari로 열기
+Mở câu thả thính ¦ Open flirty lines ¦ Ouvrir les phrases de drague ¦ Abrir frases para ligar ¦ 打开撩人语句 ¦ 口説き文句を開く ¦ 플러팅 문구 열기
+Mở hồ sơ của bạn ¦ Open your profile ¦ Ouvrir votre profil ¦ Abrir tu perfil ¦ 打开你的资料 ¦ プロフィールを開く ¦ 내 프로필 열기
+Mở nhanh từ màn hình chính ¦ Open quickly from your home screen ¦ Ouvrez-la vite depuis l’écran d’accueil ¦ Ábrela rápido desde la pantalla de inicio ¦ 从主屏幕快速打开 ¦ ホーム画面からすぐに開けます ¦ 홈 화면에서 바로 열기
+Nghi ngờ chưa đủ 18 tuổi ¦ Possibly under 18 ¦ Possiblement mineur ¦ Posible menor de 18 ¦ 疑似未满 18 岁 ¦ 18歳未満の疑い ¦ 18세 미만 의심
+Nghề nghiệp ¦ Job ¦ Métier ¦ Trabajo ¦ 职业 ¦ 職業 ¦ 직업
+Nghề nghiệp (tùy chọn) ¦ Job (optional) ¦ Métier (facultatif) ¦ Trabajo (opcional) ¦ 职业（可选） ¦ 職業（任意） ¦ 직업 (선택)
+Nghề nghiệp và vóc dáng do mỗi người tự mô tả. Điều quan trọng là sự chân thành, tôn trọng và đồng thuận. ¦ Jobs and body types are self-described. What matters is sincerity, respect and consent. ¦ Le métier et la silhouette sont décrits par chacun. L’essentiel : sincérité, respect et consentement. ¦ El trabajo y el físico los describe cada uno. Lo importante es la sinceridad, el respeto y el consentimiento. ¦ 职业和体型由本人自述。重要的是真诚、尊重和同意。 ¦ 職業や体型は自己申告です。大切なのは誠実さ、尊重、同意です。 ¦ 직업과 체형은 본인이 직접 적어요. 중요한 건 진심, 존중, 동의예요.
+Nghề nghiệp và vóc dáng là hai lựa chọn riêng biệt. ¦ Job and body type are separate choices. ¦ Métier et silhouette sont deux choix distincts. ¦ Trabajo y físico son dos opciones distintas. ¦ 职业和体型是两个独立的选项。 ¦ 職業と体型は別々に選べます。 ¦ 직업과 체형은 따로 고를 수 있어요.
+Nguyên tắc cộng đồng ¦ Community guidelines ¦ Règles de la communauté ¦ Normas de la comunidad ¦ 社区准则 ¦ コミュニティガイドライン ¦ 커뮤니티 가이드라인
+Người cùng gu ở gần ¦ People like you nearby ¦ Des affinités à proximité ¦ Gente de tu tipo cerca ¦ 附近的同好 ¦ 近くの好みが合う人 ¦ 근처의 취향 맞는 사람
+Người nhận vẫn có thể chụp màn hình. ¦ The recipient can still take a screenshot. ¦ Le destinataire peut toujours faire une capture d’écran. ¦ El destinatario aún puede hacer una captura. ¦ 对方仍可截屏。 ¦ 相手はスクリーンショットを撮ることができます。 ¦ 받는 사람은 여전히 스크린샷을 찍을 수 있어요.
+Nhập khu vực và chọn mong muốn kết nối. ¦ Enter your area and choose what you’re looking for. ¦ Indiquez votre région et ce que vous recherchez. ¦ Indica tu zona y lo que buscas. ¦ 请填写地区并选择交友目的。 ¦ エリアを入力し、求めている関係を選んでください。 ¦ 지역을 입력하고 원하는 관계를 선택하세요.
+Nhập tin nhắn hoặc chọn ảnh/video. ¦ Type a message or choose a photo/video. ¦ Écrivez un message ou choisissez une photo/vidéo. ¦ Escribe un mensaje o elige una foto/vídeo. ¦ 请输入消息或选择照片/视频。 ¦ メッセージを入力するか、写真・動画を選んでください。 ¦ 메시지를 입력하거나 사진/동영상을 선택하세요.
+Nhắn cho {}… ¦ Message {}… ¦ Écrire à {}… ¦ Escribe a {}… ¦ 给 {} 发消息… ¦ {} さんにメッセージ… ¦ {}에게 메시지…
+Nhắn tin ¦ Message ¦ Écrire ¦ Mensaje ¦ 发消息 ¦ メッセージ ¦ 메시지
+Nhắn tin với {} ¦ Message {} ¦ Écrire à {} ¦ Escribir a {} ¦ 给 {} 发消息 ¦ {} さんにメッセージ ¦ {}에게 메시지
+Nhắn tin ↗ ¦ Message ↗ ¦ Écrire ↗ ¦ Escribir ↗ ¦ 发消息 ↗ ¦ メッセージ ↗ ¦ 메시지 ↗
+Những người khiến bạn muốn tìm hiểu thêm. ¦ People you’d like to know better. ¦ Les personnes que vous aimeriez mieux connaître. ¦ Personas que te gustaría conocer mejor. ¦ 让你想进一步了解的人。 ¦ もっと知りたい人たち。 ¦ 더 알고 싶은 사람들.
+Những điều bạn thích, một buổi hẹn lý tưởng… ¦ Things you love, your ideal date… ¦ Ce que vous aimez, votre rendez-vous idéal… ¦ Lo que te gusta, tu cita ideal… ¦ 你喜欢的事、理想的约会… ¦ 好きなこと、理想のデート… ¦ 좋아하는 것, 이상적인 데이트…
+Nông dân / Làm vườn ¦ Farmer / Gardener ¦ Agriculteur / Jardinier ¦ Agricultor / Jardinero ¦ 农民 / 园艺 ¦ 農家 / 庭仕事 ¦ 농부 / 원예
+Năng động ngoài trời ¦ Active outdoors ¦ Actif en plein air ¦ Activo al aire libre ¦ 热爱户外 ¦ アウトドア派 ¦ 야외 활동파
+PT / Huấn luyện viên ¦ Personal trainer / Coach ¦ Coach sportif ¦ Entrenador personal ¦ 私教 / 教练 ¦ パーソナルトレーナー ¦ PT / 트레이너
+Phiên đăng nhập được lưu trên trình duyệt. Hãy đăng xuất khi dùng thiết bị chung. ¦ Your session is saved in this browser. Sign out on shared devices. ¦ Votre session est enregistrée dans ce navigateur. Déconnectez-vous sur un appareil partagé. ¦ Tu sesión se guarda en este navegador. Cierra sesión en dispositivos compartidos. ¦ 登录状态保存在此浏览器中。在共用设备上请退出登录。 ¦ ログイン状態はこのブラウザに保存されます。共有端末ではログアウトしてください。 ¦ 로그인 상태가 이 브라우저에 저장돼요. 공용 기기에서는 로그아웃하세요.
+Quay lại danh sách ¦ Back to list ¦ Retour à la liste ¦ Volver a la lista ¦ 返回列表 ¦ 一覧に戻る ¦ 목록으로 돌아가기
+Quyền riêng tư ¦ Privacy ¦ Confidentialité ¦ Privacidad ¦ 隐私 ¦ プライバシー ¦ 개인정보
+Quản trị ¦ Admin ¦ Administration ¦ Administración ¦ 管理 ¦ 管理 ¦ 관리
+Quấy rối hoặc ép buộc ¦ Harassment or pressure ¦ Harcèlement ou pression ¦ Acoso o presión ¦ 骚扰或强迫 ¦ 嫌がらせ・強要 ¦ 괴롭힘 또는 강요
+Riêng tư ¦ Privacy ¦ Confidentialité ¦ Privacidad ¦ 隐私 ¦ プライバシー ¦ 개인정보
+Riêng tư theo cách của bạn. ¦ Privacy, your way. ¦ La confidentialité, à votre façon. ¦ Privacidad a tu manera. ¦ 隐私，由你掌控。 ¦ プライバシーは、あなたらしく。 ¦ 나만의 방식으로 지키는 개인정보.
+RẮN RỎI. CHÂN THÀNH. CÙNG GU. ¦ STRONG. SINCERE. YOUR TYPE. ¦ SOLIDE. SINCÈRE. VOTRE STYLE. ¦ FUERTE. SINCERO. TU TIPO. ¦ 硬朗。真诚。同好。 ¦ たくましく。誠実に。好みが合う。 ¦ 단단하게. 진심으로. 같은 취향.
+Rắn rỏi ¦ Sturdy ¦ Solide ¦ Robusto ¦ 结实 ¦ がっしり ¦ 단단한 체형
+Spam hoặc chào bán ¦ Spam or selling ¦ Spam ou vente ¦ Spam o ventas ¦ 垃圾信息或推销 ¦ スパム・勧誘 ¦ 스팸 또는 판매
+SỨC HÚT KHÔNG CHỈ Ở PHÒNG GYM ¦ APPEAL ISN’T ONLY AT THE GYM ¦ LE CHARME NE SE LIMITE PAS À LA SALLE ¦ EL ATRACTIVO NO ESTÁ SOLO EN EL GIMNASIO ¦ 魅力不止在健身房 ¦ 魅力はジムの中だけじゃない ¦ 매력은 헬스장에만 있지 않아요
+Sức hút bắt đầu từ sự tôn trọng ¦ Attraction starts with respect ¦ Le charme commence par le respect ¦ El atractivo empieza con respeto ¦ 吸引力始于尊重 ¦ 魅力は尊重から始まる ¦ 매력은 존중에서 시작돼요
+Sức hút bắt đầu từ sự tôn trọng. ¦ Attraction starts with respect. ¦ Le charme commence par le respect. ¦ El atractivo empieza con respeto. ¦ 吸引力始于尊重。 ¦ 魅力は尊重から始まる。 ¦ 매력은 존중에서 시작돼요.
+Sức hút không chỉ ở phòng gym. ¦ Appeal isn’t only at the gym. ¦ Le charme ne se limite pas à la salle. ¦ El atractivo no está solo en el gimnasio. ¦ 魅力不止在健身房。 ¦ 魅力はジムの中だけじゃない。 ¦ 매력은 헬스장에만 있지 않아요.
+Sức hút từ cuộc sống đời thường ¦ Appeal from everyday life ¦ Le charme du quotidien ¦ El atractivo de la vida diaria ¦ 来自日常生活的魅力 ¦ 日常から生まれる魅力 ¦ 일상에서 오는 매력
+Sử dụng ảnh của bạn. Không giả mạo danh tính, spam hoặc dùng hẹn hò để ép mua dịch vụ. ¦ Use your own photos. No fake identities, spam, or using dating to push sales. ¦ Utilisez vos propres photos. Pas de fausse identité, de spam ni de vente forcée via les rencontres. ¦ Usa tus propias fotos. Nada de identidades falsas, spam ni usar las citas para vender. ¦ 使用你自己的照片。禁止冒充身份、发垃圾信息或借约会推销。 ¦ 自分の写真を使いましょう。なりすまし、スパム、出会いを利用した勧誘は禁止です。 ¦ 본인 사진을 사용하세요. 신분 사칭, 스팸, 데이트를 이용한 판매 강요는 금지예요.
+Thiết lập gu kết nối ¦ Set up your preferences ¦ Définir vos préférences ¦ Configura tus preferencias ¦ 设置交友偏好 ¦ 好みを設定 ¦ 취향 설정하기
+Thu nhỏ ¦ Minimize ¦ Réduire ¦ Minimizar ¦ 最小化 ¦ 最小化 ¦ 최소화
+Thêm ¦ Add ¦ Ajouter ¦ Añadir ¦ 添加 ¦ 追加 ¦ 추가
+Thêm thông tin để mọi người biết bạn ¦ Add details so people can get to know you ¦ Ajoutez des infos pour qu’on vous connaisse ¦ Añade información para que te conozcan ¦ 补充信息，让大家了解你 ¦ 情報を追加して自分を知ってもらいましょう ¦ 정보를 추가해 나를 알려 주세요
+Thêm vào MH chính ¦ Add to Home Screen ¦ Sur l’écran d’accueil ¦ Añadir a inicio ¦ 添加到主屏幕 ¦ ホーム画面に追加 ¦ 홈 화면에 추가
+Thêm ảnh hoặc video ¦ Add photos or videos ¦ Ajouter des photos ou vidéos ¦ Añadir fotos o vídeos ¦ 添加照片或视频 ¦ 写真・動画を追加 ¦ 사진 또는 동영상 추가
+Thích ¦ Like ¦ J’aime ¦ Me gusta ¦ 喜欢 ¦ いいね ¦ 좋아요
+Thích {} ¦ Like {} ¦ Aimer {} ¦ Me gusta {} ¦ 喜欢 {} ¦ {} さんにいいね ¦ {} 좋아요
+Thông báo trên máy ¦ Device notifications ¦ Notifications de l’appareil ¦ Notificaciones del dispositivo ¦ 设备通知 ¦ 端末の通知 ¦ 기기 알림
+Thông tin do người dùng tự mô tả ¦ Self-described by members ¦ Décrit par les membres eux-mêmes ¦ Descrito por cada miembro ¦ 由用户自述 ¦ ユーザーの自己申告 ¦ 회원이 직접 작성
+Thả thính ¦ Flirt ¦ Draguer ¦ Ligar ¦ 撩一下 ¦ アプローチ ¦ 플러팅
+Thả thính {} ¦ Flirt with {} ¦ Draguer {} ¦ Ligar con {} ¦ 撩 {} ¦ {} さんにアプローチ ¦ {}에게 플러팅
+Thử lại ¦ Try again ¦ Réessayer ¦ Reintentar ¦ 重试 ¦ 再試行 ¦ 다시 시도
+Thử mở rộng khoảng cách hoặc bỏ bớt điều kiện lọc. ¦ Try a wider distance or fewer filters. ¦ Élargissez la distance ou retirez des filtres. ¦ Prueba una distancia mayor o menos filtros. ¦ 试试扩大距离或减少筛选条件。 ¦ 距離を広げるか、条件を減らしてみてください。 ¦ 거리를 넓히거나 필터를 줄여 보세요.
+Tin nhắn ¦ Messages ¦ Messages ¦ Mensajes ¦ 消息 ¦ メッセージ ¦ 메시지
+Tin nhắn mới ¦ New message ¦ Nouveau message ¦ Mensaje nuevo ¦ 新消息 ¦ 新着メッセージ ¦ 새 메시지
+Tiếp tục với Google ¦ Continue with Google ¦ Continuer avec Google ¦ Continuar con Google ¦ 使用 Google 继续 ¦ Google で続ける ¦ Google로 계속하기
+Trang chỉ dành cho người từ 18 tuổi. Vui lòng đóng trang nếu bạn chưa đủ tuổi. ¦ This site is for people 18 and over only. Please close it if you are under 18. ¦ Ce site est réservé aux 18 ans et plus. Fermez-le si vous êtes mineur. ¦ Este sitio es solo para mayores de 18 años. Ciérralo si eres menor. ¦ 本站仅限 18 岁及以上人士。未满 18 岁请关闭页面。 ¦ このサイトは18歳以上限定です。18歳未満の方はページを閉じてください。 ¦ 이 사이트는 만 18세 이상만 이용할 수 있어요. 미성년자라면 페이지를 닫아 주세요.
+Trình duyệt không hỗ trợ vị trí. ¦ Your browser doesn’t support location. ¦ Votre navigateur ne prend pas en charge la localisation. ¦ Tu navegador no admite la ubicación. ¦ 浏览器不支持定位。 ¦ ブラウザが位置情報に対応していません。 ¦ 브라우저가 위치를 지원하지 않아요.
+Trình duyệt này không hỗ trợ thông báo. ¦ This browser doesn’t support notifications. ¦ Ce navigateur ne prend pas en charge les notifications. ¦ Este navegador no admite notificaciones. ¦ 此浏览器不支持通知。 ¦ このブラウザは通知に対応していません。 ¦ 이 브라우저는 알림을 지원하지 않아요.
+Trò chuyện rồi tìm hiểu ¦ Chat first, then see ¦ Discuter d’abord, puis voir ¦ Charlar primero y ver ¦ 先聊聊再了解 ¦ まずは話してから ¦ 먼저 대화부터
+Trò chuyện với {} ¦ Chat with {} ¦ Discussion avec {} ¦ Chat con {} ¦ 与 {} 聊天 ¦ {} さんとのチャット ¦ {}와 대화
+Trả lời ¦ Reply ¦ Répondre ¦ Responder ¦ 回复 ¦ 返信 ¦ 답장
+Trong {} km ¦ Within {} km ¦ À moins de {} km ¦ A menos de {} km ¦ {} 公里内 ¦ {} km 以内 ¦ {}km 이내
+Tuổi ¦ Age ¦ Âge ¦ Edad ¦ 年龄 ¦ 年齢 ¦ 나이
+Tuổi · từ 18 trở lên ¦ Age · 18 or over ¦ Âge · 18 ans ou plus ¦ Edad · 18 o más ¦ 年龄 · 18 岁及以上 ¦ 年齢 · 18歳以上 ¦ 나이 · 18세 이상
+Tài khoản ¦ Account ¦ Compte ¦ Cuenta ¦ 账户 ¦ アカウント ¦ 계정
+Tài khoản bị báo cáo sẽ không thể sử dụng dịch vụ. Bạn có thể khôi phục trong cơ sở dữ liệu quản trị. ¦ The reported account will no longer be able to use the service. You can restore it in the admin database. ¦ Le compte signalé ne pourra plus utiliser le service. Vous pouvez le restaurer dans la base d’administration. ¦ La cuenta denunciada no podrá usar el servicio. Puedes restaurarla en la base de datos de administración. ¦ 被举报的账户将无法使用服务。你可以在管理数据库中恢复。 ¦ 通報されたアカウントはサービスを利用できなくなります。管理データベースで復元できます。 ¦ 신고된 계정은 서비스를 이용할 수 없어요. 관리자 데이터베이스에서 복구할 수 있어요.
+Tên ¦ Name ¦ Nom ¦ Nombre ¦ 名字 ¦ 名前 ¦ 이름
+Tên của bạn ¦ Your name ¦ Votre nom ¦ Tu nombre ¦ 你的名字 ¦ あなたの名前 ¦ 내 이름
+Tên hiển thị ¦ Display name ¦ Nom affiché ¦ Nombre visible ¦ 显示名称 ¦ 表示名 ¦ 표시 이름
+Tên và ảnh từ Google không tự động xuất hiện trên hồ sơ hẹn hò. Bạn chọn thông tin muốn chia sẻ. ¦ Your Google name and photo don’t appear on your dating profile automatically. You choose what to share. ¦ Votre nom et votre photo Google n’apparaissent pas automatiquement sur votre profil. Vous choisissez ce que vous partagez. ¦ Tu nombre y foto de Google no aparecen automáticamente en tu perfil. Tú eliges qué compartir. ¦ Google 名字和照片不会自动出现在约会资料上。分享什么由你决定。 ¦ Google の名前や写真が自動でプロフィールに載ることはありません。共有する情報はあなたが選びます。 ¦ Google 이름과 사진은 데이팅 프로필에 자동으로 표시되지 않아요. 공유할 정보는 직접 선택해요.
+Tên, nghề, sở thích… ¦ Name, job, interests… ¦ Nom, métier, centres d’intérêt… ¦ Nombre, trabajo, intereses… ¦ 名字、职业、兴趣… ¦ 名前・職業・趣味… ¦ 이름, 직업, 관심사…
+Tìm hiểu thêm ↗ ¦ Learn more ↗ ¦ En savoir plus ↗ ¦ Saber más ↗ ¦ 了解更多 ↗ ¦ 詳しく見る ↗ ¦ 자세히 보기 ↗
+Tìm hồ sơ theo tên nghề nghiệp hoặc sở thích ¦ Search profiles by name, job or interests ¦ Rechercher par nom, métier ou centres d’intérêt ¦ Buscar perfiles por nombre, trabajo o intereses ¦ 按名字、职业或兴趣搜索资料 ¦ 名前・職業・趣味で検索 ¦ 이름, 직업, 관심사로 프로필 검색
+Tìm người bạn thấy thu hút, theo cách của riêng mình. ¦ Find the people you find attractive, your own way. ¦ Trouvez les personnes qui vous attirent, à votre façon. ¦ Encuentra a quien te atrae, a tu manera. ¦ 用你自己的方式，找到吸引你的人。 ¦ あなたらしく、惹かれる人を見つけよう。 ¦ 나만의 방식으로 끌리는 사람을 찾아요.
+Tìm người cùng tần số ¦ Find your wavelength ¦ Trouvez votre longueur d’onde ¦ Encuentra tu sintonía ¦ 寻找同频的人 ¦ 同じ周波数の人を探す ¦ 같은 주파수 찾기
+Tìm người ở gần ¦ Find people nearby ¦ Trouver à proximité ¦ Buscar cerca ¦ 寻找附近的人 ¦ 近くの人を探す ¦ 근처 사람 찾기
+Tính cách giữ chân. ¦ Personality makes them stay. ¦ La personnalité retient. ¦ La personalidad enamora. ¦ 性格留住人。 ¦ 人柄で惹きつける。 ¦ 성격이 마음을 붙잡아요.
